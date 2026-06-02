@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getCredentials, saveCredentials } from '../lib/supabase'
+import { getCredentials, saveCredentials, signOut } from '../lib/supabase'
 import Modal from '../components/Modal'
 import { BalanceForm } from '../components/EntryForms'
 
@@ -54,6 +54,12 @@ export default function Settings({ onCredentialsChange }) {
           今月の口座残高を入力
         </button>
         {!connected && <p className="muted small">※ 先に Supabase 接続情報を保存してください。</p>}
+      </div>
+
+      <div className="card">
+        <h3 className="section-title">アカウント</h3>
+        <p className="muted small">ログアウトするとログイン画面に戻ります。</p>
+        <button className="btn" onClick={() => signOut()}>ログアウト</button>
       </div>
 
       <Modal open={showBalance} title="口座残高の入力" onClose={() => setShowBalance(false)}>

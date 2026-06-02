@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { hasCredentials } from './lib/supabase'
+import { useState, useEffect } from 'react'
+import { hasCredentials, getSession, onAuthChange } from './lib/supabase'
 import ThisMonth from './pages/ThisMonth'
 import MonthlyReport from './pages/MonthlyReport'
 import YearlySummary from './pages/YearlySummary'
 import Trends from './pages/Trends'
 import Settings from './pages/Settings'
+import Login from './pages/Login'
 
 // 共通のラインアート風 SVG（ヘッダーロゴと同じスタイル）
 function Svg({ children }) {
@@ -69,51 +70,84 @@ const TABS = [
 
 export default function App() {
   const [connected, setConnected] = useState(hasCredentials())
-  const [tab, setTab] = useState(connected ? 'this' : 'settings')
+  const [session, setSession] = useState(null)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [tab, setTab] = useState('this')
 
-  function handleCredentialsChange() {
+  // 接続情報がある場合、ログイン状態を確認し変化を購読する
+  useEffect(() => {
+    if (!connected) {
+      setAuthChecked(true)
+      return
+    }
+    setAuthChecked(false)
+    getSession()
+      .then((s) => setSession(s))
+      .catch(() => setSession(null))
+      .finally(() => setAuthChecked(true))
+    const unsubscribe = onAuthChange((s) => setSession(s))
+    return unsubscribe
+  }, [connected])
+
+  function handleConnected() {
     setConnected(hasCredentials())
   }
 
   function renderPage() {
-    if (!connected && tab !== 'settings') {
-      return (
-        <div className="page">
-          <div className="notice">
-            <h2>ようこそ 👋</h2>
-            <p>はじめに「設定」タブから Supabase の接続情報を入力してください。</p>
-            <button className="btn primary" onClick={() => setTab('settings')}>設定を開く</button>
-          </div>
-        </div>
-      )
-    }
     switch (tab) {
       case 'this': return <ThisMonth />
       case 'month': return <MonthlyReport />
       case 'year': return <YearlySummary />
       case 'trend': return <Trends />
-      case 'settings': return <Settings onCredentialsChange={handleCredentialsChange} />
+      case 'settings': return <Settings onCredentialsChange={handleConnected} />
       default: return null
     }
   }
 
+  const header = (
+    <header className="app-header">
+      <svg className="app-logo" viewBox="0 0 64 64" fill="none" stroke="#166534"
+        strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {/* coin stack */}
+        <ellipse cx="22" cy="13" rx="9" ry="3.2" />
+        <path d="M13 13v6c0 1.8 4 3.2 9 3.2s9-1.4 9-3.2v-6" />
+        <path d="M13 19v6c0 1.8 4 3.2 9 3.2s9-1.4 9-3.2v-6" />
+        {/* house */}
+        <path d="M10 34 32 18l22 16" />
+        <path d="M16 32v22h32V32" />
+        <rect x="27" y="40" width="10" height="14" />
+        <rect x="38" y="38" width="7" height="7" />
+      </svg>
+      <h1>Haruka ChiChan Kakeibo</h1>
+    </header>
+  )
+
+  // 認証確認中
+  if (connected && !authChecked) {
+    return (
+      <div className="app">
+        {header}
+        <main className="app-main"><div className="state-msg">読み込み中...</div></main>
+      </div>
+    )
+  }
+
+  // 未接続 or 未ログイン → ログイン画面（タブやコンテンツは表示しない）
+  if (!connected || !session) {
+    return (
+      <div className="app">
+        {header}
+        <main className="app-main">
+          <Login connected={connected} onConnected={handleConnected} />
+        </main>
+      </div>
+    )
+  }
+
+  // ログイン済み → アプリ本体
   return (
     <div className="app">
-      <header className="app-header">
-        <svg className="app-logo" viewBox="0 0 64 64" fill="none" stroke="#166534"
-          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          {/* coin stack */}
-          <ellipse cx="22" cy="13" rx="9" ry="3.2" />
-          <path d="M13 13v6c0 1.8 4 3.2 9 3.2s9-1.4 9-3.2v-6" />
-          <path d="M13 19v6c0 1.8 4 3.2 9 3.2s9-1.4 9-3.2v-6" />
-          {/* house */}
-          <path d="M10 34 32 18l22 16" />
-          <path d="M16 32v22h32V32" />
-          <rect x="27" y="40" width="10" height="14" />
-          <rect x="38" y="38" width="7" height="7" />
-        </svg>
-        <h1>Haruka ChiChan Kakeibo</h1>
-      </header>
+      {header}
 
       <main className="app-main">{renderPage()}</main>
 

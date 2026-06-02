@@ -243,6 +243,29 @@ select:focus, input:focus { outline: none; border-color: var(--primary); }
 }
 .notice h2 { margin-top: 0; }
 
+/* ログイン画面 */
+.login-screen {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+}
+.login-title {
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 20px;
+  letter-spacing: -0.01em;
+}
+.login-card .btn.primary { width: 100%; margin-top: 4px; }
+
 @media (min-width: 600px) {
   .modal-overlay { align-items: center; }
   .modal { border-radius: 12px; }
