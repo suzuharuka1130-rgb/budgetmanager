@@ -3,7 +3,7 @@
 export const CARD_TYPES = {
   fixed: { label: 'STARTS（家賃・ガス・水道・電気）', short: 'STARTS', color: '#2563eb' }, // blue
   daily: { label: 'Olive（生活費）', short: 'Olive', color: '#16a34a' },                 // green
-  other: { label: 'Rakuten Pink（変動費）', short: 'Rakuten Pink', color: '#ea580c' },    // orange
+  other: { label: 'Rakuten Pink（変動費）', short: 'Rakuten Pink', color: '#db2777' },    // pink
 }
 
 export const OTHER_EXPENSE_TYPES = {

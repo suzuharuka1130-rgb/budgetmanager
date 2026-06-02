@@ -83,7 +83,7 @@ export default function YearlySummary() {
           <h3 className="section-title">入金・貯蓄</h3>
           <div className="stat-grid" style={{ marginBottom: '12px' }}>
             <StatCard label="入金合計" value={formatYen(totals.income)} color="#0ea5e9" accent />
-            <StatCard label="年間貯蓄（入金−支出）" value={formatYen(netSavings)} color={netSavings >= 0 ? '#16a34a' : '#dc2626'} accent />
+            <StatCard label="年間収支" value={formatYen(netSavings)} color={netSavings >= 0 ? '#16a34a' : '#dc2626'} accent />
           </div>
 
           <h3 className="section-title">支出内訳</h3>
