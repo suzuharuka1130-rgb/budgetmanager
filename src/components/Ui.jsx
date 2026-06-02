@@ -22,7 +22,6 @@ export function ErrorMsg({ error }) {
 
 // 月内の全明細を1つのリストにまとめて表示
 export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
-  const [activeRowId, setActiveRowId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
 
   const rows = [
@@ -31,8 +30,8 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
     ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: OTHER_EXPENSE_TYPES[r.type]?.label || r.type, amount: r.amount, note: r.note, color: '#6b7280', sign: '-' })),
   ]
 
-  async function handleDelete(e, r) {
-    e.stopPropagation()
+  async function handleDelete(r) {
+    if (deletingId) return
     const confirmation = window.confirm(`${r.kind}「${r.label}${r.note ? ` (${r.note})` : ''}」を削除してもよろしいですか？`)
     if (!confirmation) return
 
@@ -53,44 +52,40 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
     }
   }
 
-  function handleRowClick(id) {
-    setActiveRowId((prev) => (prev === id ? null : id))
-  }
-
   if (rows.length === 0) return <p className="muted">明細はありません。</p>
 
   return (
     <ul className="entry-list">
       {rows.map((r) => (
-        <li
-          key={r.id}
-          className={`entry-item ${activeRowId === r.id ? 'active' : ''}`}
-          onClick={() => handleRowClick(r.id)}
-        >
+        <li key={r.id} className="entry-item">
           <span className="dot" style={{ background: r.color }} />
-          <span className="entry-kind">{r.kind}</span>
-          <span className="entry-label">{r.label}</span>
-          <span className="entry-note muted">{r.note || ''}</span>
-          <div className="entry-right">
-            <span className="entry-amount" style={{ color: r.sign === '+' ? '#0ea5e9' : '#111' }}>
-              {r.sign}{formatYen(r.amount)}
-            </span>
-            {onRefresh && (
-              <button
-                className="entry-delete-btn"
-                onClick={(e) => handleDelete(e, r)}
-                disabled={deletingId === r.id}
-                title="削除"
-              >
-                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-              </button>
-            )}
+          <div className="entry-main">
+            <div className="entry-head">
+              <span className="entry-kind">{r.kind}</span>
+              <span className="entry-label">{r.label}</span>
+            </div>
+            {r.note && <span className="entry-note muted">{r.note}</span>}
           </div>
+          <span className="entry-amount" style={{ color: r.sign === '+' ? '#0ea5e9' : '#111' }}>
+            {r.sign}{formatYen(r.amount)}
+          </span>
+          {onRefresh && (
+            <button
+              type="button"
+              className="entry-delete-btn"
+              onClick={() => handleDelete(r)}
+              disabled={deletingId === r.id}
+              aria-label="削除"
+              title="削除"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          )}
         </li>
       ))}
     </ul>

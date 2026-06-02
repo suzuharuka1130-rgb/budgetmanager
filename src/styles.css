@@ -176,73 +176,42 @@ select:focus, input:focus { outline: none; border-color: var(--primary); }
 /* 明細リスト */
 .entry-list { list-style: none; padding: 0; margin: 4px 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .entry-list li {
-  display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 11px 14px;
+  gap: 10px;
+  padding: 10px 12px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   font-size: 14px;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s ease-in-out;
 }
 .entry-list li:last-child { border-bottom: none; }
-.entry-list li:hover { background: var(--block); }
-.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.entry-kind { font-size: 11px; color: var(--muted); }
-.entry-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; grid-column: 3 / 5; }
-.entry-note { font-size: 12px; text-align: right; grid-column: 3; }
-.entry-amount { font-weight: 700; white-space: nowrap; }
-
-.entry-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  grid-column: 4;
-  justify-content: flex-end;
-}
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.entry-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.entry-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.entry-kind { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.entry-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.entry-note { font-size: 12px; }
+.entry-amount { font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 
 .entry-delete-btn {
+  flex-shrink: 0;
   background: none;
   border: none;
   color: var(--muted);
   cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
+  padding: 8px;
+  margin: -4px -4px -4px 0;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease-in-out;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background 0.15s, color 0.15s;
 }
-
-.entry-delete-btn:hover {
-  background: rgba(220, 38, 38, 0.1);
-  color: #dc2626;
-}
-
-.entry-delete-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-@media (hover: hover) {
-  .entry-delete-btn {
-    opacity: 0;
-    pointer-events: none;
-  }
-  .entry-item:hover .entry-delete-btn {
-    opacity: 1;
-    pointer-events: auto;
-  }
-}
-
-/* For mobile/SP view when tapped / activated */
-.entry-item.active .entry-delete-btn {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
+.entry-delete-btn:hover { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+.entry-delete-btn:active { background: rgba(220, 38, 38, 0.18); color: #dc2626; }
+.entry-delete-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* モーダル */
 .modal-overlay {
