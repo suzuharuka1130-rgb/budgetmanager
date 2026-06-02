@@ -61,7 +61,7 @@ export default function MonthlyReport() {
           <h3 className="section-title">入金・残高</h3>
           <div className="stat-grid" style={{ marginBottom: '12px' }}>
             <StatCard label="入金合計" value={formatYen(totalIncome)} color="#0ea5e9" accent />
-            <StatCard label="差引残額" value={formatYen(net)} color={net >= 0 ? '#16a34a' : '#dc2626'} accent />
+            <StatCard label="月間収支" value={formatYen(net)} color={net >= 0 ? '#16a34a' : '#dc2626'} accent />
           </div>
 
           <h3 className="section-title">支出内訳</h3>
