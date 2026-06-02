@@ -2,7 +2,7 @@ import { formatYen, CARD_TYPES, OTHER_EXPENSE_TYPES, monthLabel } from '../lib/h
 
 export function StatCard({ label, value, color, accent }) {
   return (
-    <div className="stat-card" style={accent ? { borderTopColor: color } : undefined}>
+    <div className="stat-card" style={accent ? { borderBottomColor: color } : undefined}>
       <div className="stat-label">{label}</div>
       <div className="stat-value" style={color ? { color } : undefined}>{value}</div>
     </div>
