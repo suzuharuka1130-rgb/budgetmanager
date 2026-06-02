@@ -67,7 +67,7 @@ export async function fetchRange(months) {
 // 利用可能な年の一覧（収入・支出から）
 export async function fetchAvailableYears() {
   const c = client()
-  const tables = ['monthly_income', 'card_expenses', 'other_expenses']
+  const tables = ['monthly_income', 'card_expenses', 'other_expenses', 'account_balance']
   const results = await Promise.all(tables.map((t) => c.from(t).select('year')))
   const years = new Set()
   for (const r of results) {

@@ -1,27 +1,49 @@
 import { useEffect, useState, useCallback } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { fetchRange } from '../lib/api'
-import { lastNMonths, formatYen, sumAmount, CARD_TYPES } from '../lib/helpers'
+import { fetchRange, fetchAvailableYears } from '../lib/api'
+import { currentYearMonth, formatYen, sumAmount, CARD_TYPES } from '../lib/helpers'
 import { Loading, ErrorMsg } from '../components/Ui'
 
+// 選択年の1月から、今年なら現在月まで・過去年なら12月までの {year, month} 配列
+function monthsOfYear(year, cur) {
+  const end = year === cur.year ? cur.month : 12
+  return Array.from({ length: end }, (_, i) => ({ year, month: i + 1 }))
+}
+
 export default function Trends() {
-  const months = lastNMonths(12)
+  const cur = currentYearMonth()
+  const [years, setYears] = useState([cur.year])
+  const [year, setYear] = useState(cur.year)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  // データのある年のみをドロップダウンに表示
+  useEffect(() => {
+    fetchAvailableYears()
+      .then((ys) => {
+        if (ys.length) {
+          setYears(ys)
+          setYear(ys.includes(cur.year) ? cur.year : ys[0])
+        }
+      })
+      .catch(() => {})
+  }, [cur.year])
+
+  const months = monthsOfYear(year, cur)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      setData(await fetchRange(months))
+      setData(await fetchRange(monthsOfYear(year, cur)))
     } catch (e) {
       setError(e)
     } finally {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [year])
 
   useEffect(() => { load() }, [load])
 
@@ -49,7 +71,12 @@ export default function Trends() {
 
   return (
     <div className="page">
-      <h2 className="page-title">トレンド（過去12ヶ月）</h2>
+      <h2 className="page-title">トレンド</h2>
+      <div className="selector-row">
+        <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
+        </select>
+      </div>
 
       {loading ? <Loading /> : error ? <ErrorMsg error={error} /> : (
         <>
