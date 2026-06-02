@@ -38,11 +38,11 @@ export default function Trends() {
     })
     cardSeries = months.map(({ year, month }) => ({
       name: `${month}月`,
-      固定費: sumAmount(matchM(data.cards, year, month).filter((r) => r.card_type === 'fixed')),
-      生活費: sumAmount(matchM(data.cards, year, month).filter((r) => r.card_type === 'daily')),
-      変動費: sumAmount(matchM(data.cards, year, month).filter((r) => r.card_type === 'other')),
+      STARTS: sumAmount(matchM(data.cards, year, month).filter((r) => r.card_type === 'fixed')),
+      Olive: sumAmount(matchM(data.cards, year, month).filter((r) => r.card_type === 'daily')),
+      'Rakuten Pink': sumAmount(matchM(data.cards, year, month).filter((r) => r.card_type === 'other')),
     }))
-    variableSeries = cardSeries.map((r) => ({ name: r.name, 変動費: r.変動費 }))
+    variableSeries = cardSeries.map((r) => ({ name: r.name, 'Rakuten Pink': r['Rakuten Pink'] }))
   }
 
   const yTick = (v) => '¥' + (v / 10000) + '万'
@@ -75,22 +75,22 @@ export default function Trends() {
                 <YAxis tickFormatter={yTick} fontSize={11} width={56} />
                 <Tooltip formatter={(v) => formatYen(v)} />
                 <Legend />
-                <Line type="monotone" dataKey="固定費" stroke={CARD_TYPES.fixed.color} strokeWidth={2} dot={{ r: 2 }} />
-                <Line type="monotone" dataKey="生活費" stroke={CARD_TYPES.daily.color} strokeWidth={2} dot={{ r: 2 }} />
-                <Line type="monotone" dataKey="変動費" stroke={CARD_TYPES.other.color} strokeWidth={2} dot={{ r: 2 }} />
+                <Line type="monotone" dataKey="STARTS" stroke={CARD_TYPES.fixed.color} strokeWidth={2} dot={{ r: 2 }} />
+                <Line type="monotone" dataKey="Olive" stroke={CARD_TYPES.daily.color} strokeWidth={2} dot={{ r: 2 }} />
+                <Line type="monotone" dataKey="Rakuten Pink" stroke={CARD_TYPES.other.color} strokeWidth={2} dot={{ r: 2 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
           <div className="chart-card">
-            <h3 className="section-title">変動費（カードC）の推移</h3>
+            <h3 className="section-title">Rakuten Pink（変動費）の推移</h3>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={variableSeries} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" fontSize={12} />
                 <YAxis tickFormatter={yTick} fontSize={11} width={56} />
                 <Tooltip formatter={(v) => formatYen(v)} />
-                <Line type="monotone" dataKey="変動費" stroke={CARD_TYPES.other.color} strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="Rakuten Pink" stroke={CARD_TYPES.other.color} strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

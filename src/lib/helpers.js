@@ -1,9 +1,9 @@
 // 日付・通貨フォーマット等のユーティリティ
 
 export const CARD_TYPES = {
-  fixed: { label: 'A 固定費', short: 'A', color: '#2563eb' },   // blue
-  daily: { label: 'B 生活費', short: 'B', color: '#16a34a' },   // green
-  other: { label: 'C 変動費', short: 'C', color: '#ea580c' },   // orange
+  fixed: { label: 'STARTS（家賃・ガス・水道・電気）', short: 'STARTS', color: '#2563eb' }, // blue
+  daily: { label: 'Olive（生活費）', short: 'Olive', color: '#16a34a' },                 // green
+  other: { label: 'Rakuten Pink（変動費）', short: 'Rakuten Pink', color: '#ea580c' },    // orange
 }
 
 export const OTHER_EXPENSE_TYPES = {
