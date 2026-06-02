@@ -1,7 +1,7 @@
 -- 家計簿アプリ Supabase スキーマ
 -- Supabase の SQL Editor で実行してください。
 
--- 月次収入
+-- 月次入金
 create table if not exists monthly_income (
   id bigint generated always as identity primary key,
   year int not null,
