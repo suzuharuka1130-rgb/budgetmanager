@@ -58,17 +58,22 @@ export default function MonthlyReport() {
 
       {loading ? <Loading /> : error ? <ErrorMsg error={error} /> : (
         <>
-          <div className="stat-grid">
-            <StatCard label="収入合計" value={formatYen(totalIncome)} color="#0ea5e9" accent />
+          <h3 className="section-title">入金・残高</h3>
+          <div className="stat-grid" style={{ marginBottom: '12px' }}>
+            <StatCard label="入金合計" value={formatYen(totalIncome)} color="#0ea5e9" accent />
+            <StatCard label="差引残額" value={formatYen(net)} color={net >= 0 ? '#16a34a' : '#dc2626'} accent />
+          </div>
+
+          <h3 className="section-title">支出内訳</h3>
+          <div className="stat-grid" style={{ marginBottom: '12px' }}>
             <StatCard label={CARD_TYPES.fixed.label} value={formatYen(cardTotals.fixed)} color={CARD_TYPES.fixed.color} accent />
             <StatCard label={CARD_TYPES.daily.label} value={formatYen(cardTotals.daily)} color={CARD_TYPES.daily.color} accent />
             <StatCard label={CARD_TYPES.other.label} value={formatYen(cardTotals.other)} color={CARD_TYPES.other.color} accent />
             <StatCard label="その他支出" value={formatYen(totalOther)} color={OTHER_COLOR} accent />
-            <StatCard label="差引残額" value={formatYen(net)} color={net >= 0 ? '#16a34a' : '#dc2626'} accent />
           </div>
 
-          <h3 className="section-title">明細一覧</h3>
-          <EntryList income={data.income} cards={data.cards} others={data.others} />
+          <h3 className="section-title">明細</h3>
+          <EntryList income={data.income} cards={data.cards} others={data.others} onRefresh={load} />
         </>
       )}
     </div>

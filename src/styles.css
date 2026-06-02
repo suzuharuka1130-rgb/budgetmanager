@@ -1,9 +1,9 @@
 :root {
-  --bg: #f1f1ef;          /* light gray app background */
+  --bg: #f7f7f5;          /* light gray app background */
   --surface: #ffffff;      /* white: inputs, modal, list rows */
-  --block: #e3e3df;       /* darker gray cards */
-  --hover: #d9d9d3;
-  --border: #d4d4ce;
+  --block: #eeeeeb;       /* gray cards */
+  --hover: #e4e4df;
+  --border: #deded8;
   --text: #37352f;
   --muted: #787774;
   --primary: #166534;       /* dark green */
@@ -107,8 +107,8 @@ body {
 .hero-sub { margin-top: 8px; font-size: 13px; color: var(--muted); }
 
 /* クイックアクション */
-.quick-actions { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
-.quick-actions .btn { flex: 1; min-width: 110px; }
+.quick-actions { display: flex; gap: 6px; margin-top: 12px; flex-wrap: nowrap; }
+.quick-actions .btn { flex: 1; min-width: 0; white-space: nowrap; padding: 8px 6px; font-size: 13px; }
 
 /* ボタン — フラット */
 .btn {
@@ -184,14 +184,65 @@ select:focus, input:focus { outline: none; border-color: var(--primary); }
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease-in-out;
 }
 .entry-list li:last-child { border-bottom: none; }
 .entry-list li:hover { background: var(--block); }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .entry-kind { font-size: 11px; color: var(--muted); }
-.entry-label { font-weight: 600; }
+.entry-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; grid-column: 3 / 5; }
 .entry-note { font-size: 12px; text-align: right; grid-column: 3; }
 .entry-amount { font-weight: 700; white-space: nowrap; }
+
+.entry-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  grid-column: 4;
+  justify-content: flex-end;
+}
+
+.entry-delete-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease-in-out;
+}
+
+.entry-delete-btn:hover {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.entry-delete-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) {
+  .entry-delete-btn {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .entry-item:hover .entry-delete-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* For mobile/SP view when tapped / activated */
+.entry-item.active .entry-delete-btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
 
 /* モーダル */
 .modal-overlay {

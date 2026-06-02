@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchRange, fetchAvailableYears } from '../lib/api'
-import { currentYearMonth, formatYen, sumAmount, CARD_TYPES } from '../lib/helpers'
+import { currentYearMonth, formatYen, sumAmount, CARD_TYPES, netByMonthMap, buildBalanceSeries } from '../lib/helpers'
 import { Loading, ErrorMsg } from '../components/Ui'
 
 // 選択年の1月から、今年なら現在月まで・過去年なら12月までの {year, month} 配列
@@ -53,11 +53,11 @@ export default function Trends() {
 
   if (data) {
     const matchM = (rows, y, m) => rows.filter((r) => r.year === y && r.month === m)
-    balanceSeries = months.map(({ year, month }) => {
-      const snaps = matchM(data.balance, year, month)
-      const latest = snaps.length ? snaps[snaps.length - 1].balance : null
-      return { name: `${month}月`, 残高: latest === null ? null : Number(latest) }
-    })
+    const netByKey = netByMonthMap(data.income, data.cards, data.others)
+    balanceSeries = buildBalanceSeries(months, data.balance, netByKey).map(({ month, balance }) => ({
+      name: `${month}月`,
+      残高: balance === null ? null : Number(balance),
+    }))
     cardSeries = months.map(({ year, month }) => ({
       name: `${month}月`,
       STARTS: sumAmount(matchM(data.cards, year, month).filter((r) => r.card_type === 'fixed')),

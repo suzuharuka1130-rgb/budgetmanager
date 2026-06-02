@@ -49,9 +49,12 @@ export default function Settings({ onCredentialsChange }) {
 
       <div className="card">
         <h3 className="section-title">口座残高スナップショット</h3>
-        <p className="muted small">今月の実際の口座残高を手入力で記録します（トレンドの残高グラフに反映されます）。</p>
+        <p className="muted small">
+          実際の口座残高を手入力で記録します（トレンドの残高グラフに反映されます）。
+          記録した月以降は、その残高を起点に毎月の「入金 − 支出」を自動で加算して残高を算出します。
+        </p>
         <button className="btn" disabled={!connected} onClick={() => setShowBalance(true)}>
-          今月の口座残高を入力
+          口座残高を入力
         </button>
         {!connected && <p className="muted small">※ 先に Supabase 接続情報を保存してください。</p>}
       </div>

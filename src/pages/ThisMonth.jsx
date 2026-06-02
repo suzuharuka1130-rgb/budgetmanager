@@ -48,20 +48,28 @@ export default function ThisMonth() {
     <div className="page">
       <div className="hero">
         <div className="hero-month">{monthLabel(year, month)}</div>
-        <div className="hero-remaining">
-          <span>今月の残額</span>
-          <strong style={{ color: remaining >= 0 ? '#16a34a' : '#dc2626' }}>{formatYen(remaining)}</strong>
+        <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', marginTop: '6px' }}>
+          <div className="hero-remaining" style={{ marginTop: 0 }}>
+            <span>今月の残額</span>
+            <strong style={{ color: remaining >= 0 ? '#16a34a' : '#dc2626' }}>{formatYen(remaining)}</strong>
+          </div>
+          <div className="hero-remaining" style={{ marginTop: 0 }}>
+            <span>現在の口座残高</span>
+            <strong>
+              {data.balance ? formatYen(data.balance.balance) : '未入力'}
+            </strong>
+          </div>
         </div>
-        <div className="hero-sub">収入 {formatYen(totalIncome)} − 支出 {formatYen(totalCards + totalOther)}</div>
+        <div className="hero-sub">入金 {formatYen(totalIncome)} − 支出 {formatYen(totalCards + totalOther)}</div>
       </div>
 
       <div className="quick-actions">
-        <button className="btn primary" onClick={() => setModal('income')}>＋ 収入入力</button>
+        <button className="btn primary" onClick={() => setModal('income')}>＋ 入金入力</button>
         <button className="btn" onClick={() => setModal('card')}>＋ カード支出</button>
         <button className="btn" onClick={() => setModal('other')}>＋ その他支出</button>
       </div>
 
-      <h3 className="section-title">収入</h3>
+      <h3 className="section-title">入金</h3>
       <div className="stat-grid">
         <StatCard label="今月の入金合計" value={formatYen(totalIncome)} color="#0ea5e9" accent />
       </div>
@@ -75,9 +83,9 @@ export default function ThisMonth() {
       </div>
 
       <h3 className="section-title">明細</h3>
-      <EntryList income={data.income} cards={data.cards} others={data.others} />
+      <EntryList income={data.income} cards={data.cards} others={data.others} onRefresh={load} />
 
-      <Modal open={modal === 'income'} title="収入入力" onClose={() => setModal(null)}>
+      <Modal open={modal === 'income'} title="入金入力" onClose={() => setModal(null)}>
         <IncomeForm onSaved={handleSaved} />
       </Modal>
       <Modal open={modal === 'card'} title="カード支出入力" onClose={() => setModal(null)}>

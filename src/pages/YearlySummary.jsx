@@ -48,7 +48,7 @@ export default function YearlySummary() {
       totals.daily += daily
       totals.other += cother
       totals.otherExp += otherExp
-      return { name: `${m}月`, 収入: income, 支出: spending }
+      return { name: `${m}月`, 入金: income, 支出: spending }
     })
   }
   const totalSpending = totals.fixed + totals.daily + totals.other + totals.otherExp
@@ -66,7 +66,7 @@ export default function YearlySummary() {
       {loading ? <Loading /> : error ? <ErrorMsg error={error} /> : (
         <>
           <div className="chart-card">
-            <h3 className="section-title">月別 収入 vs 支出</h3>
+            <h3 className="section-title">月別 入金 vs 支出</h3>
             <ResponsiveContainer width="100%" height={320}>
               <BarChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -74,20 +74,24 @@ export default function YearlySummary() {
                 <YAxis tickFormatter={(v) => '¥' + (v / 10000) + '万'} fontSize={11} width={56} />
                 <Tooltip formatter={(v) => formatYen(v)} />
                 <Legend />
-                <Bar dataKey="収入" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="入金" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="支出" fill="#ea580c" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          <h3 className="section-title">年間合計</h3>
+          <h3 className="section-title">入金・貯蓄</h3>
+          <div className="stat-grid" style={{ marginBottom: '12px' }}>
+            <StatCard label="入金合計" value={formatYen(totals.income)} color="#0ea5e9" accent />
+            <StatCard label="年間貯蓄（入金−支出）" value={formatYen(netSavings)} color={netSavings >= 0 ? '#16a34a' : '#dc2626'} accent />
+          </div>
+
+          <h3 className="section-title">支出内訳</h3>
           <div className="stat-grid">
-            <StatCard label="収入合計" value={formatYen(totals.income)} color="#0ea5e9" accent />
             <StatCard label={CARD_TYPES.fixed.label} value={formatYen(totals.fixed)} color={CARD_TYPES.fixed.color} accent />
             <StatCard label={CARD_TYPES.daily.label} value={formatYen(totals.daily)} color={CARD_TYPES.daily.color} accent />
             <StatCard label={CARD_TYPES.other.label} value={formatYen(totals.other)} color={CARD_TYPES.other.color} accent />
             <StatCard label="その他支出" value={formatYen(totals.otherExp)} color={OTHER_COLOR} accent />
-            <StatCard label="年間貯蓄（収入−支出）" value={formatYen(netSavings)} color={netSavings >= 0 ? '#16a34a' : '#dc2626'} accent />
           </div>
         </>
       )}
