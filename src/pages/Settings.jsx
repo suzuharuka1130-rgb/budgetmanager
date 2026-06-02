@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getCredentials, saveCredentials, signOut } from '../lib/supabase'
+import { getCredentials, saveCredentials, signOut, hasEnvCredentials } from '../lib/supabase'
 import Modal from '../components/Modal'
 import { BalanceForm } from '../components/EntryForms'
 
@@ -26,25 +26,34 @@ export default function Settings({ onCredentialsChange }) {
 
       <div className="card">
         <h3 className="section-title">Supabase 接続情報</h3>
-        <p className="muted small">
-          ご自身の Supabase プロジェクトに接続します。入力した値はこのブラウザの localStorage に保存されます。
-          プロジェクト設定 → API から URL と anon public キーをコピーしてください。
-          初回はリポジトリ内の <code>supabase_schema.sql</code> を Supabase の SQL Editor で実行してテーブルを作成してください。
-        </p>
-        <form className="entry-form" onSubmit={handleSave}>
-          <label className="field">
-            <span>Supabase URL</span>
-            <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://xxxxx.supabase.co" required />
-          </label>
-          <label className="field">
-            <span>anon public キー</span>
-            <input type="text" value={anonKey} onChange={(e) => setAnonKey(e.target.value)}
-              placeholder="eyJhbGci..." required />
-          </label>
-          <button type="submit" className="btn primary">保存</button>
-          {saved && <p className="form-ok">保存しました。</p>}
-        </form>
+        {hasEnvCredentials() ? (
+          <p className="muted small">
+            接続情報は環境変数（VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY）から読み込まれています。
+            すべての端末で自動的に接続されるため、ここでの入力は不要です。
+          </p>
+        ) : (
+          <>
+            <p className="muted small">
+              ご自身の Supabase プロジェクトに接続します。入力した値はこのブラウザの localStorage に保存されます。
+              プロジェクト設定 → API から URL と anon public キーをコピーしてください。
+              初回はリポジトリ内の <code>supabase_schema.sql</code> を Supabase の SQL Editor で実行してテーブルを作成してください。
+            </p>
+            <form className="entry-form" onSubmit={handleSave}>
+              <label className="field">
+                <span>Supabase URL</span>
+                <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://xxxxx.supabase.co" required />
+              </label>
+              <label className="field">
+                <span>anon public キー</span>
+                <input type="text" value={anonKey} onChange={(e) => setAnonKey(e.target.value)}
+                  placeholder="eyJhbGci..." required />
+              </label>
+              <button type="submit" className="btn primary">保存</button>
+              {saved && <p className="form-ok">保存しました。</p>}
+            </form>
+          </>
+        )}
       </div>
 
       <div className="card">

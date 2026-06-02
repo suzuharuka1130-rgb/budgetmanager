@@ -3,11 +3,20 @@ import { createClient } from '@supabase/supabase-js'
 const URL_KEY = 'budget_supabase_url'
 const ANON_KEY = 'budget_supabase_anon_key'
 
+// ビルド時に埋め込まれる環境変数（Vercel 等で設定）。設定済みなら全端末で優先利用される。
+const ENV_URL = import.meta.env.VITE_SUPABASE_URL || ''
+const ENV_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+
 export function getCredentials() {
   return {
-    url: localStorage.getItem(URL_KEY) || '',
-    anonKey: localStorage.getItem(ANON_KEY) || '',
+    url: ENV_URL || localStorage.getItem(URL_KEY) || '',
+    anonKey: ENV_ANON_KEY || localStorage.getItem(ANON_KEY) || '',
   }
+}
+
+// 環境変数で接続情報が用意されているか（設定画面の表示制御などに使用）
+export function hasEnvCredentials() {
+  return Boolean(ENV_URL && ENV_ANON_KEY)
 }
 
 export function saveCredentials(url, anonKey) {
