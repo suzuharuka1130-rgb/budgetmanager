@@ -212,6 +212,15 @@ select:focus, input:focus { outline: none; border-color: var(--primary); }
 .entry-delete-btn:hover { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
 .entry-delete-btn:active { background: rgba(220, 38, 38, 0.18); color: #dc2626; }
 .entry-delete-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.entry-delete-btn svg { pointer-events: none; }
+
+/* 削除確認モーダル */
+.confirm-body { display: flex; flex-direction: column; gap: 16px; }
+.confirm-body p { margin: 0; line-height: 1.6; }
+.confirm-actions { display: flex; gap: 8px; }
+.confirm-actions .btn { flex: 1; }
+.btn.danger { background: #dc2626; color: #fff; border-color: #dc2626; }
+.btn.danger:hover { background: #b91c1c; }
 
 /* モーダル */
 .modal-overlay {
