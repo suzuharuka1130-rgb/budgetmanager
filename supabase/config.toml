@@ -3,9 +3,10 @@
 # [functions.*] ブロックだけを既存ファイルにマージしてください。
 project_id = "budgetmanager"
 
-# 設定画面のテスト送信はログインユーザーのJWTで呼び出すため検証ON
+# ブラウザからのCORSプリフライト(OPTIONS)を通すためゲートウェイのJWT検証はOFFにし、
+# 関数内で Authorization ヘッダーのJWTを手動検証する（index.ts を参照）。
 [functions.send-line-message]
-verify_jwt = true
+verify_jwt = false
 
 # 以下はcron（pg_cron）から service role キーで起動するため検証OFF
 [functions.monthly-reminder]
