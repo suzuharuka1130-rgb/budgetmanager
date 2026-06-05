@@ -56,9 +56,9 @@ export async function buildMonthlyReportMessage() {
     `🏦 口座残高：${balanceText}`,
     DIVIDER,
     '【先月利用額 (今月引き落とし予定)】',
-    `🏠 固定費：${formatYen(f2)}`,
-    `🛒 生活費：${formatYen(d2)}`,
-    `🛍️ 変動費：${formatYen(o2)}`,
+    `🏠 Starts：${formatYen(f2)}`,
+    `🛒 Olive：${formatYen(d2)}`,
+    `🛍️ Rakuten：${formatYen(o2)}`,
     `💳 引き落とし合計：${formatYen(total2)}`,
   ].join('\n')
 }

@@ -133,9 +133,9 @@ export async function buildMonthlyReportMessage(sb: SupabaseClient): Promise<str
     `🏦 口座残高：${balanceText}`,
     DIVIDER,
     '【先月利用額 (今月引き落とし予定)】',
-    `🏠 固定費：${yen(f2)}`,
-    `🛒 生活費：${yen(d2)}`,
-    `🛍️ 変動費：${yen(o2)}`,
+    `🏠 Starts：${yen(f2)}`,
+    `🛒 Olive：${yen(d2)}`,
+    `🛍️ Rakuten：${yen(o2)}`,
     `💳 引き落とし合計：${yen(total2)}`,
   ].join('\n')
 }
