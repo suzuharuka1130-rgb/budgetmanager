@@ -1,0 +1,18 @@
+# Supabase ローカル設定（Edge Functions の JWT 検証設定）。
+# すでに `supabase init` 済みで config.toml がある場合は、以下の
+# [functions.*] ブロックだけを既存ファイルにマージしてください。
+project_id = "budgetmanager"
+
+# 設定画面のテスト送信はログインユーザーのJWTで呼び出すため検証ON
+[functions.send-line-message]
+verify_jwt = true
+
+# 以下はcron（pg_cron）から service role キーで起動するため検証OFF
+[functions.monthly-reminder]
+verify_jwt = false
+
+[functions.credit-input-reminder]
+verify_jwt = false
+
+[functions.monthly-report]
+verify_jwt = false
