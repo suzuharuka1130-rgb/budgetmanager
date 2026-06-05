@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { signIn, saveCredentials, getCredentials } from '../lib/supabase'
+import { Button } from '../components/ui/button'
 
 // Supabase 未設定時に表示する初期設定フォーム
 function SetupForm({ onConnected }) {
@@ -29,7 +30,7 @@ function SetupForm({ onConnected }) {
         <input type="text" value={anonKey} onChange={(e) => setAnonKey(e.target.value)}
           placeholder="eyJhbGci..." required />
       </label>
-      <button type="submit" className="btn primary">接続する</button>
+      <Button type="submit" className="w-full">接続する</Button>
     </form>
   )
 }
@@ -68,9 +69,9 @@ function LoginForm() {
           autoComplete="current-password" placeholder="••••••••" required />
       </label>
       {error && <p className="form-error">{error}</p>}
-      <button type="submit" className="btn primary" disabled={submitting}>
+      <Button type="submit" className="w-full" disabled={submitting}>
         {submitting ? 'ログイン中...' : 'ログイン'}
-      </button>
+      </Button>
     </form>
   )
 }

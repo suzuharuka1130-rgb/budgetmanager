@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { hasCredentials, getSession, onAuthChange } from './lib/supabase'
 import ThisMonth from './pages/ThisMonth'
 import MonthlyReport from './pages/MonthlyReport'
@@ -149,13 +150,29 @@ export default function App() {
     <div className="app">
       {header}
 
-      <main className="app-main">{renderPage()}</main>
+      <main className="app-main">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {renderPage()}
+          </motion.div>
+        </AnimatePresence>
+      </main>
 
       <nav className="tab-bar">
         {TABS.map((t) => (
           <button key={t.key}
             className={'tab' + (tab === t.key ? ' active' : '')}
             onClick={() => setTab(t.key)}>
+            {tab === t.key && (
+              <motion.span className="tab-active-pill" layoutId="tab-active-pill"
+                transition={{ type: 'spring', stiffness: 500, damping: 38 }} />
+            )}
             <span className="tab-icon"><t.Icon /></span>
             <span className="tab-label">{t.label}</span>
           </button>
