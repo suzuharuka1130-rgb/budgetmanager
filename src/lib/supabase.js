@@ -62,6 +62,20 @@ export async function signOut() {
   await c.auth.signOut()
 }
 
+// send-line-message Edge Function を呼び出してLINEへ送信
+export async function sendLineMessage(message) {
+  const c = getClient()
+  if (!c) throw new Error('Supabase の接続情報が設定されていません。')
+  const { data, error } = await c.functions.invoke('send-line-message', {
+    body: { message },
+  })
+  if (error) throw error
+  if (data && data.success === false) {
+    throw new Error('LINE送信に失敗しました（チャネルトークン/ユーザーIDをご確認ください）。')
+  }
+  return data
+}
+
 // ログイン状態の変化を購読。解除用の関数を返す。
 export function onAuthChange(callback) {
   const c = getClient()

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { getCredentials, saveCredentials, signOut, hasEnvCredentials } from '../lib/supabase'
+import { getCredentials, saveCredentials, signOut, hasEnvCredentials, sendLineMessage } from '../lib/supabase'
+import { buildMonthlyReportMessage } from '../lib/report'
 import Modal from '../components/Modal'
 import { BalanceForm } from '../components/EntryForms'
 
@@ -9,6 +10,8 @@ export default function Settings({ onCredentialsChange }) {
   const [anonKey, setAnonKey] = useState(initial.anonKey)
   const [saved, setSaved] = useState(false)
   const [showBalance, setShowBalance] = useState(false)
+  const [lineSending, setLineSending] = useState(false)
+  const [lineResult, setLineResult] = useState(null) // { ok, text }
 
   function handleSave(e) {
     e.preventDefault()
@@ -16,6 +19,20 @@ export default function Settings({ onCredentialsChange }) {
     setSaved(true)
     onCredentialsChange?.()
     setTimeout(() => setSaved(false), 2500)
+  }
+
+  async function handleLineTest() {
+    setLineSending(true)
+    setLineResult(null)
+    try {
+      const message = await buildMonthlyReportMessage()
+      await sendLineMessage(message)
+      setLineResult({ ok: true, text: 'LINEに月次レポートを送信しました。' })
+    } catch (e) {
+      setLineResult({ ok: false, text: e.message || String(e) })
+    } finally {
+      setLineSending(false)
+    }
   }
 
   const connected = Boolean(initial.url && initial.anonKey)
@@ -66,6 +83,21 @@ export default function Settings({ onCredentialsChange }) {
           口座残高を入力
         </button>
         {!connected && <p className="muted small">※ 先に Supabase 接続情報を保存してください。</p>}
+      </div>
+
+      <div className="card">
+        <h3 className="section-title">LINE通知</h3>
+        <p className="muted small">
+          月次レポートの書式を、現在のデータでLINEに即時送信してプレビューできます。
+          （送信先は環境変数 LINE_USER_ID_ME / LINE_USER_ID_WIFE の設定に従います）
+        </p>
+        <button className="btn" disabled={!connected || lineSending} onClick={handleLineTest}>
+          {lineSending ? '送信中...' : 'LINE通知テスト送信'}
+        </button>
+        {!connected && <p className="muted small">※ 先に Supabase 接続情報を保存してください。</p>}
+        {lineResult && (
+          <p className={lineResult.ok ? 'form-ok' : 'form-error'}>{lineResult.text}</p>
+        )}
       </div>
 
       <div className="card">
