@@ -53,8 +53,19 @@ export function lastNMonths(n, from = currentYearMonth()) {
   return result
 }
 
+// 明細が確定済みか（confirmed が明示的に false 以外なら確定とみなす）
+export function isConfirmed(row) {
+  return row?.confirmed !== false
+}
+
+// (year, month) が現在月より未来か（未来月の入力は確定待ちにする）
+export function isFutureMonth(year, month, now = currentYearMonth()) {
+  return year > now.year || (year === now.year && month > now.month)
+}
+
+// 合計（確定済みの明細のみ集計。未確定＝未来月の入力は除外）
 export function sumAmount(rows) {
-  return (rows || []).reduce((acc, r) => acc + Number(r.amount || 0), 0)
+  return (rows || []).reduce((acc, r) => (isConfirmed(r) ? acc + Number(r.amount || 0) : acc), 0)
 }
 
 // 月キー（"2026-6"）。year/month から一意な文字列を作る。
@@ -82,9 +93,10 @@ export function netByMonthMap(income = [], cards = [], others = []) {
     const k = monthKey(y, m)
     map.set(k, (map.get(k) || 0) + delta)
   }
-  for (const r of income) add(r.year, r.month, Number(r.amount || 0))
-  for (const r of cards) add(r.year, r.month, -Number(r.amount || 0))
-  for (const r of others) add(r.year, r.month, -Number(r.amount || 0))
+  // 口座残高の算出も確定済みの明細のみを対象にする
+  for (const r of income) if (isConfirmed(r)) add(r.year, r.month, Number(r.amount || 0))
+  for (const r of cards) if (isConfirmed(r)) add(r.year, r.month, -Number(r.amount || 0))
+  for (const r of others) if (isConfirmed(r)) add(r.year, r.month, -Number(r.amount || 0))
   return map
 }
 

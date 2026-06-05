@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { formatYen, CARD_TYPES, OTHER_EXPENSE_TYPES, monthLabel } from '../lib/helpers'
-import { deleteIncome, deleteCardExpense, deleteOtherExpense } from '../lib/api'
+import {
+  deleteIncome, deleteCardExpense, deleteOtherExpense,
+  confirmIncome, confirmCardExpense, confirmOtherExpense,
+} from '../lib/api'
 import Modal from './Modal'
 import { Button } from './ui/button'
 
@@ -28,12 +31,32 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
   const [deletingId, setDeletingId] = useState(null)
   const [confirmRow, setConfirmRow] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
+  const [confirmingId, setConfirmingId] = useState(null)
 
+  const pending = (r) => r.confirmed === false
   const rows = [
-    ...income.map((r) => ({ id: 'i' + r.id, dbId: r.id, table: 'income', kind: '入金', label: '入金', amount: r.amount, note: r.note, color: '#0ea5e9', sign: '+' })),
-    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: CARD_TYPES[r.card_type]?.label || r.card_type, amount: r.amount, note: r.note, color: CARD_TYPES[r.card_type]?.color, sign: '-' })),
-    ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: OTHER_EXPENSE_TYPES[r.type]?.label || r.type, amount: r.amount, note: r.note, color: '#6b7280', sign: '-' })),
+    ...income.map((r) => ({ id: 'i' + r.id, dbId: r.id, table: 'income', kind: '入金', label: '入金', amount: r.amount, note: r.note, color: '#0ea5e9', sign: '+', pending: pending(r) })),
+    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: CARD_TYPES[r.card_type]?.label || r.card_type, amount: r.amount, note: r.note, color: CARD_TYPES[r.card_type]?.color, sign: '-', pending: pending(r) })),
+    ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: OTHER_EXPENSE_TYPES[r.type]?.label || r.type, amount: r.amount, note: r.note, color: '#6b7280', sign: '-', pending: pending(r) })),
   ]
+
+  async function performConfirm(r) {
+    setConfirmingId(r.id)
+    try {
+      if (r.table === 'income') {
+        await confirmIncome(r.dbId)
+      } else if (r.table === 'cards') {
+        await confirmCardExpense(r.dbId)
+      } else if (r.table === 'others') {
+        await confirmOtherExpense(r.dbId)
+      }
+      if (onRefresh) onRefresh()
+    } catch (err) {
+      alert('確定に失敗しました: ' + (err.message || String(err)))
+    } finally {
+      setConfirmingId(null)
+    }
+  }
 
   async function performDelete(r) {
     setDeletingId(r.id)
@@ -64,7 +87,7 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
           {rows.map((r, i) => (
             <motion.li
               key={r.id}
-              className="entry-item"
+              className={'entry-item' + (r.pending ? ' pending' : '')}
               layout
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -76,12 +99,24 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
                 <div className="entry-head">
                   <span className="entry-kind">{r.kind}</span>
                   <span className="entry-label">{r.label}</span>
+                  {r.pending && <span className="entry-badge">未確定</span>}
                 </div>
                 {r.note && <span className="entry-note muted">{r.note}</span>}
               </div>
-              <span className="entry-amount" style={{ color: r.sign === '+' ? '#0ea5e9' : '#111' }}>
+              <span className="entry-amount" style={{ color: r.pending ? '#9b9a97' : (r.sign === '+' ? '#0ea5e9' : '#111') }}>
                 {r.sign}{formatYen(r.amount)}
               </span>
+              {onRefresh && r.pending && (
+                <button
+                  type="button"
+                  className="entry-confirm-btn"
+                  onClick={() => performConfirm(r)}
+                  disabled={confirmingId === r.id}
+                  title="確定して口座残高に反映"
+                >
+                  {confirmingId === r.id ? '...' : '確定'}
+                </button>
+              )}
               {onRefresh && (
                 <button
                   type="button"
