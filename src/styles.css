@@ -170,7 +170,19 @@ select, input[type="month"], input[type="number"], input[type="text"], input[typ
   background: var(--surface);
   color: var(--text);
   width: 100%;
+  min-width: 0;
 }
+/* iOS Safari の input[type=month] が幅100%を無視して横にはみ出すのを防ぐ */
+input[type="month"], input[type="number"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type="month"] {
+  display: block;
+  max-width: 100%;
+  text-align: left;
+}
+input[type="month"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
 select:focus, input:focus { outline: none; border-color: var(--primary); }
 .selector-row select { width: auto; }
 
