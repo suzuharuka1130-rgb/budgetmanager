@@ -67,8 +67,9 @@ body {
   padding: 4px;
 }
 .tab {
+  position: relative;
   flex: 1;
-  border: 1px solid transparent;
+  border: none;
   background: none;
   padding: 8px 4px;
   display: flex;
@@ -79,9 +80,19 @@ body {
   cursor: pointer;
   font-size: 11px;
   border-radius: var(--radius);
+  -webkit-tap-highlight-color: transparent;
 }
-.tab:hover { background: var(--block); }
-.tab.active { color: var(--primary); border-color: var(--border); background: var(--surface); font-weight: 600; }
+.tab > .tab-icon, .tab > .tab-label { position: relative; z-index: 1; }
+.tab:hover:not(.active) { background: var(--block); }
+.tab.active { color: var(--primary); font-weight: 600; }
+.tab-active-pill {
+  position: absolute;
+  inset: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  z-index: 0;
+}
 .tab-icon { display: flex; align-items: center; justify-content: center; }
 .tab-icon svg { width: 22px; height: 22px; }
 
