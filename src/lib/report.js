@@ -1,6 +1,7 @@
 // 月次レポートのメッセージ生成（フロント用）。
 // Edge Function の monthly-report と同じ書式で、設定画面のテスト送信に使用する。
 import { getClient } from './supabase'
+import { fetchMonth } from './api'
 import { formatYen, currentYearMonth } from './helpers'
 
 const DIVIDER = '━━━━━━━━━━━━━━'
@@ -38,6 +39,10 @@ export async function buildMonthlyReportMessage() {
   const o2 = await monthSum('card_expenses', cur.year, cur.month, { col: 'card_type', val: 'other' })
   const total2 = f2 + d2 + o2
 
+  // 今月初の口座残高 = 先月末時点の残高（アプリと同じ算出ロジックを再利用）
+  const lastMonthData = await fetchMonth(last.year, last.month)
+  const balanceText = lastMonthData?.balance ? formatYen(lastMonthData.balance.balance) : '未入力'
+
   return [
     `📊 [${cur.year}年${cur.month}月] 月次レポート`,
     DIVIDER,
@@ -48,6 +53,7 @@ export async function buildMonthlyReportMessage() {
     `🛍️ Rakuten (変動費)：${formatYen(o1)}`,
     `📦 その他：${formatYen(other1)}`,
     `✅ 収支：${formatYen(net)}`,
+    `🏦 口座残高：${balanceText}`,
     DIVIDER,
     '【先月利用額 (今月引き落とし予定)】',
     `🏠 固定費：${formatYen(f2)}`,
