@@ -97,7 +97,6 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
               <span className="dot" style={{ background: r.color }} />
               <div className="entry-main">
                 <div className="entry-head">
-                  <span className="entry-kind">{r.kind}</span>
                   <span className="entry-label">{r.label}</span>
                   {r.pending && <span className="entry-badge">未確定</span>}
                 </div>
