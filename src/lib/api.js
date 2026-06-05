@@ -1,5 +1,5 @@
 import { getClient } from './supabase'
-import { monthsInRange, netByMonthMap, buildBalanceSeries } from './helpers'
+import { monthsInRange, netByMonthMap, buildBalanceSeries, isFutureMonth } from './helpers'
 
 function client() {
   const c = getClient()
@@ -43,9 +43,9 @@ async function computeBalanceAt(c, year, month, snapshots) {
 
   const yearsNeeded = [...new Set(months.map((m) => m.year))]
   const [income, cards, others] = await Promise.all([
-    c.from('monthly_income').select('year,month,amount').in('year', yearsNeeded),
-    c.from('card_expenses').select('year,month,amount').in('year', yearsNeeded),
-    c.from('other_expenses').select('year,month,amount').in('year', yearsNeeded),
+    c.from('monthly_income').select('year,month,amount,confirmed').in('year', yearsNeeded),
+    c.from('card_expenses').select('year,month,amount,confirmed').in('year', yearsNeeded),
+    c.from('other_expenses').select('year,month,amount,confirmed').in('year', yearsNeeded),
   ])
   for (const r of [income, cards, others]) {
     if (r.error) throw r.error
@@ -121,18 +121,22 @@ export async function fetchAvailableYears() {
 }
 
 // ---- 追加 ----
+// 未来月の入力は confirmed=false（確定待ち）。当月・過去月は確定済み。
 export async function addIncome({ year, month, amount, note }) {
-  const { error } = await client().from('monthly_income').insert({ year, month, amount, note })
+  const confirmed = !isFutureMonth(year, month)
+  const { error } = await client().from('monthly_income').insert({ year, month, amount, note, confirmed })
   if (error) throw error
 }
 
 export async function addCardExpense({ year, month, card_type, amount, note }) {
-  const { error } = await client().from('card_expenses').insert({ year, month, card_type, amount, note })
+  const confirmed = !isFutureMonth(year, month)
+  const { error } = await client().from('card_expenses').insert({ year, month, card_type, amount, note, confirmed })
   if (error) throw error
 }
 
 export async function addOtherExpense({ year, month, type, amount, note }) {
-  const { error } = await client().from('other_expenses').insert({ year, month, type, amount, note })
+  const confirmed = !isFutureMonth(year, month)
+  const { error } = await client().from('other_expenses').insert({ year, month, type, amount, note, confirmed })
   if (error) throw error
 }
 
@@ -153,5 +157,21 @@ export async function deleteCardExpense(id) {
 
 export async function deleteOtherExpense(id) {
   const { error } = await client().from('other_expenses').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ---- 確定（未来月入力の確定待ちを口座残高に反映させる）----
+export async function confirmIncome(id) {
+  const { error } = await client().from('monthly_income').update({ confirmed: true }).eq('id', id)
+  if (error) throw error
+}
+
+export async function confirmCardExpense(id) {
+  const { error } = await client().from('card_expenses').update({ confirmed: true }).eq('id', id)
+  if (error) throw error
+}
+
+export async function confirmOtherExpense(id) {
+  const { error } = await client().from('other_expenses').update({ confirmed: true }).eq('id', id)
   if (error) throw error
 }

@@ -8,6 +8,7 @@ create table if not exists monthly_income (
   month int not null check (month between 1 and 12),
   amount numeric not null check (amount >= 0),
   note text,
+  confirmed boolean not null default true, -- 未来月の入力は false（確定待ち）
   created_at timestamptz not null default now()
 );
 
@@ -23,6 +24,7 @@ create table if not exists card_expenses (
   card_type card_type not null,
   amount numeric not null check (amount >= 0),
   note text,
+  confirmed boolean not null default true, -- 未来月の入力は false（確定待ち）
   created_at timestamptz not null default now()
 );
 
@@ -38,6 +40,7 @@ create table if not exists other_expenses (
   type other_expense_type not null,
   amount numeric not null check (amount >= 0),
   note text,
+  confirmed boolean not null default true, -- 未来月の入力は false（確定待ち）
   created_at timestamptz not null default now()
 );
 
