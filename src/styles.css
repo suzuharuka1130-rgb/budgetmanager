@@ -70,7 +70,7 @@ body {
   padding-bottom: 88px;
 }
 
-/* タブバー */
+/* タブバー（ヘッダーと同じフロステッドガラス効果） */
 .tab-bar {
   position: fixed;
   bottom: 0;
@@ -79,7 +79,9 @@ body {
   max-width: 720px;
   margin: 0 auto;
   display: flex;
-  background: var(--bg);
+  background: rgba(247, 247, 245, 0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  backdrop-filter: saturate(180%) blur(12px);
   border-top: 1px solid var(--border);
   z-index: 20;
   padding: 4px;
