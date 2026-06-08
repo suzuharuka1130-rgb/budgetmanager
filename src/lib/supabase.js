@@ -80,7 +80,7 @@ export async function sendLineMessage(message) {
 export async function sendMonthlyReport() {
   const c = getClient()
   if (!c) throw new Error('Supabase の接続情報が設定されていません。')
-  const { data, error } = await c.functions.invoke('monthly-report', { body: {} })
+  const { data, error } = await c.functions.invoke('monthly-report', { body: { test: true } })
   if (error) throw error
   if (data && data.success === false) {
     throw new Error('LINE送信に失敗しました（チャネルトークン/ユーザーIDをご確認ください）。')

@@ -10,9 +10,18 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
   try {
+    // body.test === true（設定画面のテスト送信）のときは自分だけに送る。
+    // cron は body '{}' なので両者へ送信される。
+    const body = await req.json().catch(() => ({}))
+    let userIds: string[] | undefined = undefined
+    if (body?.test === true) {
+      const me = Deno.env.get('LINE_USER_ID_ME')?.trim()
+      if (me) userIds = [me]
+    }
+
     const sb = getServiceClient()
     const message = await buildMonthlyReportMessage(sb)
-    const results = await sendLineMessage(message)
+    const results = await sendLineMessage(message, userIds)
     return jsonResponse({ success: results.every((r) => r.ok), message, results })
   } catch (e) {
     return jsonResponse({ error: String((e as Error)?.message ?? e) }, 500)
