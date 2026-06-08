@@ -110,14 +110,20 @@ export async function buildMonthlyReportMessage(
   const d1 = await monthSum(sb, 'card_expenses', last.year, last.month, { col: 'card_type', val: 'daily' })
   const o1 = await monthSum(sb, 'card_expenses', last.year, last.month, { col: 'card_type', val: 'other' })
   const other1 = await monthSum(sb, 'other_expenses', last.year, last.month)
-  const totalExpense1 = f1 + d1 + o1 + other1
+  // 家賃＆生活費 = Starts + Olive、娯楽費 = Rakuten + その他
+  const housing1 = f1 + d1
+  const leisure1 = o1 + other1
+  const totalExpense1 = housing1 + leisure1
   const net = income - totalExpense1
 
   // Section 2: 今月の引き落とし予定（先月利用額 = 今月の対象月で入力された金額）
   const f2 = await monthSum(sb, 'card_expenses', cur.year, cur.month, { col: 'card_type', val: 'fixed' })
   const d2 = await monthSum(sb, 'card_expenses', cur.year, cur.month, { col: 'card_type', val: 'daily' })
   const o2 = await monthSum(sb, 'card_expenses', cur.year, cur.month, { col: 'card_type', val: 'other' })
-  const total2 = f2 + d2 + o2
+  const other2 = await monthSum(sb, 'other_expenses', cur.year, cur.month)
+  const housing2 = f2 + d2
+  const leisure2 = o2 + other2
+  const total2 = housing2 + leisure2
 
   // 今月初の口座残高 = 先月末時点の残高
   const balance = await computeBalanceThrough(sb, last.year, last.month)
@@ -126,26 +132,24 @@ export async function buildMonthlyReportMessage(
   const baseLines = [
     `📊 [${cur.year}年${cur.month}月] 月次レポート`,
     DIVIDER,
-    '【先月の収支】',
-    `💰 入金合計：${yen(income)}`,
-    `🏠 Starts：${yen(f1)}`,
-    `🛒 Olive (生活費)：${yen(d1)}`,
-    `🛍️ Rakuten (変動費)：${yen(o1)}`,
-    `📦 その他：${yen(other1)}`,
+    `【${last.month}月の収支】`,
+    `➕ 入金合計：${yen(income)}`,
+    `➖ 家賃＆生活費：${yen(housing1)}`,
+    `➖ 娯楽費：${yen(leisure1)}`,
     `💸 支出合計：${yen(totalExpense1)}`,
     `✅ 収支：${yen(net)}`,
-    `🏦 口座残高：${balanceText}`,
+    '',
+    `🏦 支払後口座残高：${balanceText}`,
     DIVIDER,
-    '【先月利用額 (今月引き落とし予定)】',
-    `🏠 Starts：${yen(f2)}`,
-    `🛒 Olive：${yen(d2)}`,
-    `🛍️ Rakuten：${yen(o2)}`,
+    `【${cur.month}月引き落とし予定】`,
+    `🏠 家賃＆生活費：${yen(housing2)}`,
+    `🛍️ 娯楽費：${yen(leisure2)}`,
     `💳 引き落とし合計：${yen(total2)}`,
   ]
 
   // AI分析（Gemini）。失敗時は黙ってスキップし、レポート送信は止めない。
   const ai = await getGeminiAnalysis({
-    income, f1, d1, o1, other1, totalExpense1, net, f2, d2, o2, total2,
+    income, housing1, leisure1, totalExpense1, net, housing2, leisure2, total2,
   })
   const lines = [...baseLines]
   if (ai.text) {
@@ -157,8 +161,8 @@ export async function buildMonthlyReportMessage(
 
 // Gemini API で支出分析コメントを生成する。失敗時は { text:null, error } を返す。
 async function getGeminiAnalysis(d: {
-  income: number; f1: number; d1: number; o1: number; other1: number
-  totalExpense1: number; net: number; f2: number; d2: number; o2: number; total2: number
+  income: number; housing1: number; leisure1: number
+  totalExpense1: number; net: number; housing2: number; leisure2: number; total2: number
 }): Promise<{ text: string | null; error: string | null }> {
   try {
     const key = Deno.env.get('GEMINI_API_KEY')
@@ -169,17 +173,14 @@ async function getGeminiAnalysis(d: {
 
 先月の収支：
 - 入金合計：${yen(d.income)}
-- 固定費：${yen(d.f1)}
-- 生活費：${yen(d.d1)}
-- 変動費：${yen(d.o1)}
-- その他：${yen(d.other1)}
--支出合計：${yen(d.totalExpense1)}
+- 家賃＆生活費：${yen(d.housing1)}
+- 娯楽費：${yen(d.leisure1)}
+- 支出合計：${yen(d.totalExpense1)}
 - 収支：${yen(d.net)}
 
 今月の引き落とし予定（先月利用分）：
-- 固定費：${yen(d.f2)}
-- 生活費：${yen(d.d2)}
-- 変動費：${yen(d.o2)}
+- 家賃＆生活費：${yen(d.housing2)}
+- 娯楽費：${yen(d.leisure2)}
 - 合計：${yen(d.total2)}`
 
     const res = await fetch(
