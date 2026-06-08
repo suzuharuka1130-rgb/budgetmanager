@@ -189,7 +189,11 @@ async function getGeminiAnalysis(d: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 200 },
+          generationConfig: {
+            maxOutputTokens: 400,
+            // gemini-2.5系は既定で「思考」に出力トークンを消費するため無効化する
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         }),
       },
     )
