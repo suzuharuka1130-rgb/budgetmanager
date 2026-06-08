@@ -98,9 +98,7 @@ async function computeBalanceThrough(
  * 月次レポートのメッセージを生成する。
  * 基準月（current）は JST の現在月。先月（last）は前月。
  */
-export async function buildMonthlyReportMessage(
-  sb: SupabaseClient,
-): Promise<{ message: string; aiError: string | null }> {
+export async function buildMonthlyReportMessage(sb: SupabaseClient): Promise<string> {
   const cur = currentYearMonthJST()
   const last = prevMonth(cur.year, cur.month)
 
@@ -129,7 +127,7 @@ export async function buildMonthlyReportMessage(
   const balance = await computeBalanceThrough(sb, last.year, last.month)
   const balanceText = balance === null ? '未入力' : yen(balance)
 
-  const baseLines = [
+  return [
     `📊 [${cur.year}年${cur.month}月] 月次レポート`,
     DIVIDER,
     `【${last.month}月の収支】`,
@@ -144,70 +142,8 @@ export async function buildMonthlyReportMessage(
     `【${cur.month}月引き落とし予定】`,
     `🏠 家賃＆生活費：${yen(housing2)}`,
     `🛍️ 娯楽費：${yen(leisure2)}`,
-    `💳 引き落とし合計：${yen(total2)}`,
-  ]
-
-  // AI分析（Gemini）。失敗時は黙ってスキップし、レポート送信は止めない。
-  const ai = await getGeminiAnalysis({
-    income, housing1, leisure1, totalExpense1, net, housing2, leisure2, total2,
-  })
-  const lines = [...baseLines]
-  if (ai.text) {
-    lines.push(DIVIDER, '【AI分析】', ai.text)
-  }
-
-  return { message: lines.join('\n'), aiError: ai.error }
-}
-
-// Gemini API で支出分析コメントを生成する。失敗時は { text:null, error } を返す。
-async function getGeminiAnalysis(d: {
-  income: number; housing1: number; leisure1: number
-  totalExpense1: number; net: number; housing2: number; leisure2: number; total2: number
-}): Promise<{ text: string | null; error: string | null }> {
-  try {
-    const key = Deno.env.get('GEMINI_API_KEY')
-    if (!key) return { text: null, error: 'GEMINI_API_KEY 未設定' }
-
-    const prompt = `以下は夫婦の家計データです。日本語で3〜4文の簡潔な支出分析コメントを書いてください。
-先月の収支の分析、前の月との比較、今月の引き落とし予定額の分析結果をバランスよく含めてください。数字は¥形式で表記してください。
-
-先月の収支：
-- 入金合計：${yen(d.income)}
-- 家賃＆生活費：${yen(d.housing1)}
-- 娯楽費：${yen(d.leisure1)}
-- 支出合計：${yen(d.totalExpense1)}
-- 収支：${yen(d.net)}
-
-今月の引き落とし予定（先月利用分）：
-- 家賃＆生活費：${yen(d.housing2)}
-- 娯楽費：${yen(d.leisure2)}
-- 合計：${yen(d.total2)}`
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            maxOutputTokens: 400,
-            // gemini-2.5系は既定で「思考」に出力トークンを消費するため無効化する
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-      },
-    )
-    if (!res.ok) {
-      return { text: null, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 600)}` }
-    }
-    const json = await res.json()
-    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text
-    if (typeof text === 'string' && text.trim()) return { text: text.trim(), error: null }
-    return { text: null, error: 'テキストなし: ' + JSON.stringify(json).slice(0, 400) }
-  } catch (e) {
-    return { text: null, error: String((e as Error)?.message ?? e) }
-  }
+    `💳 支出合計：${yen(total2)}`,
+  ].join('\n')
 }
 
 // 月末判定（JST）
