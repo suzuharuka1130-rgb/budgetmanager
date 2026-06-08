@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { getCredentials, saveCredentials, signOut, hasEnvCredentials, sendLineMessage } from '../lib/supabase'
-import { buildMonthlyReportMessage } from '../lib/report'
+import { getCredentials, saveCredentials, signOut, hasEnvCredentials, sendMonthlyReport } from '../lib/supabase'
 import Modal from '../components/Modal'
 import { BalanceForm } from '../components/EntryForms'
 
@@ -25,9 +24,8 @@ export default function Settings({ onCredentialsChange }) {
     setLineSending(true)
     setLineResult(null)
     try {
-      const message = await buildMonthlyReportMessage()
-      await sendLineMessage(message)
-      setLineResult({ ok: true, text: 'LINEに月次レポートを送信しました。' })
+      await sendMonthlyReport()
+      setLineResult({ ok: true, text: 'LINEに月次レポート（AI分析付き）を送信しました。' })
     } catch (e) {
       setLineResult({ ok: false, text: e.message || String(e) })
     } finally {

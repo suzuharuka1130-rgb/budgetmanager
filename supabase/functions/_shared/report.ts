@@ -108,7 +108,8 @@ export async function buildMonthlyReportMessage(sb: SupabaseClient): Promise<str
   const d1 = await monthSum(sb, 'card_expenses', last.year, last.month, { col: 'card_type', val: 'daily' })
   const o1 = await monthSum(sb, 'card_expenses', last.year, last.month, { col: 'card_type', val: 'other' })
   const other1 = await monthSum(sb, 'other_expenses', last.year, last.month)
-  const net = income - (f1 + d1 + o1 + other1)
+  const totalExpense1 = f1 + d1 + o1 + other1
+  const net = income - totalExpense1
 
   // Section 2: 今月の引き落とし予定（先月利用額 = 今月の対象月で入力された金額）
   const f2 = await monthSum(sb, 'card_expenses', cur.year, cur.month, { col: 'card_type', val: 'fixed' })
@@ -120,7 +121,7 @@ export async function buildMonthlyReportMessage(sb: SupabaseClient): Promise<str
   const balance = await computeBalanceThrough(sb, last.year, last.month)
   const balanceText = balance === null ? '未入力' : yen(balance)
 
-  return [
+  const lines = [
     `📊 [${cur.year}年${cur.month}月] 月次レポート`,
     DIVIDER,
     '【先月の収支】',
@@ -129,6 +130,7 @@ export async function buildMonthlyReportMessage(sb: SupabaseClient): Promise<str
     `🛒 Olive (生活費)：${yen(d1)}`,
     `🛍️ Rakuten (変動費)：${yen(o1)}`,
     `📦 その他：${yen(other1)}`,
+    ` 支出合計：${yen(totalExpense1)}`,
     `✅ 収支：${yen(net)}`,
     `🏦 口座残高：${balanceText}`,
     DIVIDER,
@@ -137,7 +139,64 @@ export async function buildMonthlyReportMessage(sb: SupabaseClient): Promise<str
     `🛒 Olive：${yen(d2)}`,
     `🛍️ Rakuten：${yen(o2)}`,
     `💳 引き落とし合計：${yen(total2)}`,
-  ].join('\n')
+  ]
+
+  // AI分析（Gemini）。失敗時は黙ってスキップし、レポート送信は止めない。
+  const analysis = await getGeminiAnalysis({
+    income, f1, d1, o1, other1, totalExpense1, net, f2, d2, o2, total2,
+  })
+  if (analysis) {
+    lines.push(DIVIDER, '【AI分析】', analysis)
+  }
+
+  return lines.join('\n')
+}
+
+// Gemini API で支出分析コメントを生成する。失敗時は null を返す（呼び出し側でスキップ）。
+async function getGeminiAnalysis(d: {
+  income: number; f1: number; d1: number; o1: number; other1: number
+  totalExpense1: number; net: number; f2: number; d2: number; o2: number; total2: number
+}): Promise<string | null> {
+  try {
+    const key = Deno.env.get('GEMINI_API_KEY')
+    if (!key) return null
+
+    const prompt = `以下は夫婦の家計データです。日本語で3〜4文の簡潔な支出分析コメントを書いてください。
+先月の収支の分析、前の月との比較、今月の引き落とし予定額の分析結果をバランスよく含めてください。数字は¥形式で表記してください。
+
+先月の収支：
+- 入金合計：${yen(d.income)}
+- 固定費：${yen(d.f1)}
+- 生活費：${yen(d.d1)}
+- 変動費：${yen(d.o1)}
+- その他：${yen(d.other1)}
+-支出合計：${yen(d.totalExpense1)}
+- 収支：${yen(d.net)}
+
+今月の引き落とし予定（先月利用分）：
+- 固定費：${yen(d.f2)}
+- 生活費：${yen(d.d2)}
+- 変動費：${yen(d.o2)}
+- 合計：${yen(d.total2)}`
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 200 },
+        }),
+      },
+    )
+    if (!res.ok) return null
+    const json = await res.json()
+    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text
+    return typeof text === 'string' && text.trim() ? text.trim() : null
+  } catch {
+    return null
+  }
 }
 
 // 月末判定（JST）
