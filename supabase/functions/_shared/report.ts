@@ -98,7 +98,9 @@ async function computeBalanceThrough(
  * 月次レポートのメッセージを生成する。
  * 基準月（current）は JST の現在月。先月（last）は前月。
  */
-export async function buildMonthlyReportMessage(sb: SupabaseClient): Promise<string> {
+export async function buildMonthlyReportMessage(
+  sb: SupabaseClient,
+): Promise<{ message: string; aiError: string | null }> {
   const cur = currentYearMonthJST()
   const last = prevMonth(cur.year, cur.month)
 
@@ -121,7 +123,7 @@ export async function buildMonthlyReportMessage(sb: SupabaseClient): Promise<str
   const balance = await computeBalanceThrough(sb, last.year, last.month)
   const balanceText = balance === null ? '未入力' : yen(balance)
 
-  const lines = [
+  const baseLines = [
     `📊 [${cur.year}年${cur.month}月] 月次レポート`,
     DIVIDER,
     '【先月の収支】',
@@ -142,24 +144,25 @@ export async function buildMonthlyReportMessage(sb: SupabaseClient): Promise<str
   ]
 
   // AI分析（Gemini）。失敗時は黙ってスキップし、レポート送信は止めない。
-  const analysis = await getGeminiAnalysis({
+  const ai = await getGeminiAnalysis({
     income, f1, d1, o1, other1, totalExpense1, net, f2, d2, o2, total2,
   })
-  if (analysis) {
-    lines.push(DIVIDER, '【AI分析】', analysis)
+  const lines = [...baseLines]
+  if (ai.text) {
+    lines.push(DIVIDER, '【AI分析】', ai.text)
   }
 
-  return lines.join('\n')
+  return { message: lines.join('\n'), aiError: ai.error }
 }
 
-// Gemini API で支出分析コメントを生成する。失敗時は null を返す（呼び出し側でスキップ）。
+// Gemini API で支出分析コメントを生成する。失敗時は { text:null, error } を返す。
 async function getGeminiAnalysis(d: {
   income: number; f1: number; d1: number; o1: number; other1: number
   totalExpense1: number; net: number; f2: number; d2: number; o2: number; total2: number
-}): Promise<string | null> {
+}): Promise<{ text: string | null; error: string | null }> {
   try {
     const key = Deno.env.get('GEMINI_API_KEY')
-    if (!key) return null
+    if (!key) return { text: null, error: 'GEMINI_API_KEY 未設定' }
 
     const prompt = `以下は夫婦の家計データです。日本語で3〜4文の簡潔な支出分析コメントを書いてください。
 先月の収支の分析、前の月との比較、今月の引き落とし予定額の分析結果をバランスよく含めてください。数字は¥形式で表記してください。
@@ -190,12 +193,15 @@ async function getGeminiAnalysis(d: {
         }),
       },
     )
-    if (!res.ok) return null
+    if (!res.ok) {
+      return { text: null, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 400)}` }
+    }
     const json = await res.json()
     const text = json?.candidates?.[0]?.content?.parts?.[0]?.text
-    return typeof text === 'string' && text.trim() ? text.trim() : null
-  } catch {
-    return null
+    if (typeof text === 'string' && text.trim()) return { text: text.trim(), error: null }
+    return { text: null, error: 'テキストなし: ' + JSON.stringify(json).slice(0, 400) }
+  } catch (e) {
+    return { text: null, error: String((e as Error)?.message ?? e) }
   }
 }
 
