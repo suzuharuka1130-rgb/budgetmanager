@@ -132,7 +132,7 @@ export async function buildMonthlyReportMessage(
     `🛒 Olive (生活費)：${yen(d1)}`,
     `🛍️ Rakuten (変動費)：${yen(o1)}`,
     `📦 その他：${yen(other1)}`,
-    ` 支出合計：${yen(totalExpense1)}`,
+    `💸 支出合計：${yen(totalExpense1)}`,
     `✅ 収支：${yen(net)}`,
     `🏦 口座残高：${balanceText}`,
     DIVIDER,
@@ -194,7 +194,7 @@ async function getGeminiAnalysis(d: {
       },
     )
     if (!res.ok) {
-      return { text: null, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 400)}` }
+      return { text: null, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 600)}` }
     }
     const json = await res.json()
     const text = json?.candidates?.[0]?.content?.parts?.[0]?.text
