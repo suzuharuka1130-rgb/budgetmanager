@@ -71,3 +71,24 @@ do $$ begin
   create policy "allow all" on other_expenses for all using (true) with check (true);
   create policy "allow all" on account_balance for all using (true) with check (true);
 exception when duplicate_object then null; end $$;
+
+-- LINE通知設定（ユーザーごと）
+create table if not exists notification_preferences (
+  id bigint generated always as identity primary key,
+  user_id uuid not null unique references auth.users(id) on delete cascade,
+  monthly_report boolean not null default true,
+  monthly_reminder boolean not null default true,
+  credit_input_reminder boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+alter table notification_preferences enable row level security;
+
+do $$ begin
+  create policy "users can read own prefs" on notification_preferences
+    for select using (auth.uid() = user_id);
+  create policy "users can insert own prefs" on notification_preferences
+    for insert with check (auth.uid() = user_id);
+  create policy "users can update own prefs" on notification_preferences
+    for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;

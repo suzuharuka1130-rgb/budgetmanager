@@ -175,3 +175,29 @@ export async function confirmOtherExpense(id) {
   const { error } = await client().from('other_expenses').update({ confirmed: true }).eq('id', id)
   if (error) throw error
 }
+
+// ---- 通知設定 ----
+export async function fetchNotificationPreferences(userId) {
+  const c = client()
+  const { data, error } = await c
+    .from('notification_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function upsertNotificationPreferences(userId, prefs) {
+  const c = client()
+  const { error } = await c
+    .from('notification_preferences')
+    .upsert({
+      user_id: userId,
+      monthly_report: prefs.monthly_report,
+      monthly_reminder: prefs.monthly_reminder,
+      credit_input_reminder: prefs.credit_input_reminder,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+  if (error) throw error
+}
