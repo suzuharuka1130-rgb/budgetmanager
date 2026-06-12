@@ -110,7 +110,7 @@ export default function Trends() {
           </div>
 
           <div className="chart-card">
-            <h3 className="section-title">Rakuten Pink（変動費）の推移</h3>
+            <h3 className="section-title">Rakuten Pink（娯楽費）の推移</h3>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={variableSeries} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />

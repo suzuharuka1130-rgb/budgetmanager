@@ -35,11 +35,19 @@ function MonthField({ value, onChange }) {
 }
 
 function AmountField({ value, onChange, label = '金額（円）' }) {
+  const displayValue = value === '-' ? '-' : (value ? Number(value).toLocaleString('ja-JP') : '')
+
+  const handleChange = (e) => {
+    const rawValue = e.target.value
+    const cleaned = rawValue.replace(/(?!^-)[^\d]/g, '')
+    onChange(cleaned)
+  }
+
   return (
     <label className="field">
       <span>{label}</span>
-      <input type="number" inputMode="numeric" min="1" step="1" value={value}
-        onChange={(e) => onChange(e.target.value)} placeholder="0" required />
+      <input type="text" inputMode="numeric" value={displayValue}
+        onChange={handleChange} placeholder="0" required />
     </label>
   )
 }
