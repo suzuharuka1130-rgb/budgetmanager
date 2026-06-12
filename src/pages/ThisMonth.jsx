@@ -70,9 +70,7 @@ export default function ThisMonth() {
       </div>
 
       <h3 className="section-title">入金</h3>
-      <div className="stat-grid">
-        <StatCard label="今月の入金合計" value={formatYen(totalIncome)} color="#0ea5e9" accent />
-      </div>
+      <StatCard label="今月の入金合計" value={formatYen(totalIncome)} color="#0ea5e9" accent layout="row" />
 
       <h3 className="section-title">支出内訳</h3>
       <div className="stat-grid">

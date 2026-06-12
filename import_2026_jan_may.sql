@@ -33,7 +33,7 @@ insert into card_expenses (year, month, card_type, amount, note) values
   (2026, 3, 'daily', 19685, 'Olive'),
   (2026, 4, 'daily', 35107, 'Olive'),
   (2026, 5, 'daily', 155755, 'Olive'),
-  -- 変動費（楽天Pink）
+  -- 娯楽費（楽天Pink）
   (2026, 1, 'other', 30913, '楽天Pink'),
   (2026, 2, 'other', 47815, '楽天Pink'),
   (2026, 3, 'other', 93019, '楽天Pink'),
