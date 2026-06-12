@@ -340,6 +340,35 @@ select:focus, input:focus { outline: none; border-color: var(--primary); }
 }
 .card code { background: var(--block); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
+/* 通知設定トグル */
+.notify-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.notify-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  cursor: pointer;
+}
+.notify-toggle-row:last-child { border-bottom: none; }
+.notify-toggle-row:hover { background: var(--hover); }
+.notify-toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
 /* 状態メッセージ */
 .state-msg { padding: 24px; text-align: center; color: var(--muted); }
 .state-msg.error { color: #dc2626; }
