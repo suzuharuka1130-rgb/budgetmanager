@@ -3,7 +3,7 @@
 // cron からの起動に加え、設定画面のテスト送信ボタン（ブラウザ）からも呼べるよう CORS 対応。
 // レスポンスには家計データ本文（message）を含めない（情報漏えい防止）。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { sendLineMessage } from '../_shared/line.ts'
+import { sendLineMessage, getFilteredLineUserIds } from '../_shared/line.ts'
 import { buildMonthlyReportMessage, getServiceClient } from '../_shared/report.ts'
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}))
 
-    // body.test === true（設定画面のテスト送信）のときはリクエスト者のLINEのみに送る。
+    // body.test === true（設定画面 of テスト送信）のときはリクエスト者のLINEのみに送る。
     // cron は body '{}' なので両者へ送信される。
     let userIds: string[] | undefined = undefined
     if (body?.test === true) {
@@ -52,6 +52,11 @@ Deno.serve(async (req) => {
       } else {
         const me = Deno.env.get('LINE_USER_ID_ME')?.trim()
         if (me) userIds = [me]
+      }
+    } else {
+      userIds = await getFilteredLineUserIds('monthly_report')
+      if (userIds.length === 0) {
+        return jsonResponse({ success: true, skipped: true, reason: 'すべてのユーザーがこの通知をオフに設定しています。' })
       }
     }
 

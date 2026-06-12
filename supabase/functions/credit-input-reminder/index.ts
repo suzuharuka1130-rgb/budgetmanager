@@ -1,6 +1,6 @@
 // 毎月末日 9:00 JST（0:00 UTC）— クレジット入力リマインダー
 // cron は 28-31日に毎日起動し、月末日でなければ早期終了する。
-import { sendLineMessage } from '../_shared/line.ts'
+import { sendLineMessage, getFilteredLineUserIds } from '../_shared/line.ts'
 import { isLastDayOfMonthJST } from '../_shared/report.ts'
 
 const MESSAGE = `💳 クレジット入力リマインダー
@@ -14,7 +14,11 @@ Deno.serve(async () => {
   }
 
   try {
-    const results = await sendLineMessage(MESSAGE)
+    const targets = await getFilteredLineUserIds('credit_input_reminder')
+    if (targets.length === 0) {
+      return Response.json({ success: true, skipped: true, reason: 'すべてのユーザーがこの通知をオフに設定しています。' })
+    }
+    const results = await sendLineMessage(MESSAGE, targets)
     return Response.json({ success: results.every((r) => r.ok), results })
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message ?? e) }, { status: 500 })
