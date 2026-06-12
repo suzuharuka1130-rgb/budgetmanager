@@ -72,7 +72,7 @@ export default function Settings({ onCredentialsChange }) {
     setLineResult(null)
     try {
       await sendMonthlyReport()
-      setLineResult({ ok: true, text: 'LINEに月次レポート（AI分析付き）を送信しました。' })
+      setLineResult({ ok: true, text: 'LINEに月次レポートを送信しました。' })
     } catch (e) {
       setLineResult({ ok: false, text: e.message || String(e) })
     } finally {
