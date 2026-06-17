@@ -306,12 +306,23 @@ select:focus, input:focus { outline: none; border-color: var(--primary); }
 .chip.selected { border-color: var(--chip); background: color-mix(in srgb, var(--chip) 12%, white); }
 
 /* マスタ管理リスト（カード / その他支出タイプ） */
-.master-list { list-style: none; padding: 0; margin: 0 0 12px; }
+.master-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
 .master-row {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 0; border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
 }
 .master-row:last-child { border-bottom: none; }
+.master-row:hover { background: var(--hover); }
 .master-swatch { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
 .master-name { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .master-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
