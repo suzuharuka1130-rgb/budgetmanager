@@ -25,6 +25,7 @@ create table if not exists card_expenses (
   amount numeric not null check (amount >= 0),
   note text,
   confirmed boolean not null default true, -- 未来月の入力は false（確定待ち）
+  receipt_image_url text,                  -- レシート画像のStorageパス（任意）
   created_at timestamptz not null default now()
 );
 
@@ -70,6 +71,18 @@ do $$ begin
   create policy "allow all" on card_expenses for all using (true) with check (true);
   create policy "allow all" on other_expenses for all using (true) with check (true);
   create policy "allow all" on account_balance for all using (true) with check (true);
+exception when duplicate_object then null; end $$;
+
+-- レシート画像用の非公開ストレージバケット
+insert into storage.buckets (id, name, public)
+values ('receipts', 'receipts', false)
+on conflict (id) do nothing;
+
+do $$ begin
+  create policy "receipts authenticated all" on storage.objects
+    for all to authenticated
+    using (bucket_id = 'receipts')
+    with check (bucket_id = 'receipts');
 exception when duplicate_object then null; end $$;
 
 -- LINE通知設定（ユーザーごと）

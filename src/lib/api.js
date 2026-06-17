@@ -128,10 +128,34 @@ export async function addIncome({ year, month, amount, note }) {
   if (error) throw error
 }
 
-export async function addCardExpense({ year, month, card_type, amount, note }) {
+export async function addCardExpense({ year, month, card_type, amount, note, receipt_image_url = null }) {
   const confirmed = !isFutureMonth(year, month)
-  const { error } = await client().from('card_expenses').insert({ year, month, card_type, amount, note, confirmed })
+  const { error } = await client()
+    .from('card_expenses')
+    .insert({ year, month, card_type, amount, note, confirmed, receipt_image_url })
   if (error) throw error
+}
+
+// ---- レシート画像（Supabase Storage: receipts バケット）----
+const RECEIPTS_BUCKET = 'receipts'
+
+// 画像をアップロードし、保存パスを返す
+export async function uploadReceipt(file, { year, month, card_type }) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+  const path = `${year}-${month}-${card_type}-${Date.now()}.${ext}`
+  const { error } = await client().storage.from(RECEIPTS_BUCKET).upload(path, file, {
+    contentType: file.type || 'image/jpeg',
+    upsert: false,
+  })
+  if (error) throw error
+  return path
+}
+
+// 非公開バケットの画像を表示するための署名付きURL（既定60秒）
+export async function getReceiptSignedUrl(path, expiresIn = 60) {
+  const { data, error } = await client().storage.from(RECEIPTS_BUCKET).createSignedUrl(path, expiresIn)
+  if (error) throw error
+  return data.signedUrl
 }
 
 export async function addOtherExpense({ year, month, type, amount, note }) {

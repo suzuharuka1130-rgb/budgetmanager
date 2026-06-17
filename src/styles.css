@@ -331,6 +331,25 @@ select:focus, input:focus { outline: none; border-color: var(--primary); }
 .field span { font-size: 13px; color: var(--muted); }
 .form-error { color: #dc2626; font-size: 13px; margin: 0; }
 .form-ok { color: var(--primary); font-size: 13px; margin: 0; }
+.form-warning { color: #b45309; font-size: 13px; margin: 0; }
+.ai-fill-label { color: var(--primary); font-size: 12px; font-weight: 600; margin: 0; }
+
+/* レシート画像 */
+.receipt-preview { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; }
+.receipt-preview img {
+  width: 84px; height: 84px; object-fit: cover;
+  border: 1px solid var(--border); border-radius: 8px; flex-shrink: 0;
+}
+.receipt-full { width: 100%; height: auto; border-radius: 8px; display: block; }
+.entry-receipt-btn {
+  flex-shrink: 0;
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; padding: 8px; margin: -4px 0; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.entry-receipt-btn:hover { background: var(--block); color: var(--primary); }
+.entry-receipt-btn svg { pointer-events: none; }
 
 /* カード（設定など） */
 .card {
