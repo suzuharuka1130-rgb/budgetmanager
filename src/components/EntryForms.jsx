@@ -3,17 +3,30 @@ import { CARD_TYPES, OTHER_EXPENSE_TYPES, currentYearMonth, toMonthValue, fromMo
 import { addIncome, addCardExpense, addOtherExpense, setAccountBalance, uploadReceipt } from '../lib/api'
 import { analyzeReceipt } from '../lib/supabase'
 
-// File を base64（data URL プレフィックスを除いた本体）に変換
-function fileToBase64(file) {
+// 画像を縮小して JPEG base64（プレフィックス除去）に変換する。
+// スマホ写真は数MBあり、そのまま送ると Edge Function / Gemini で失敗しやすいため、
+// 最大辺を maxDim に縮小して送信を軽量・高速・確実にする（OCR精度は十分維持）。
+function downscaleImageToBase64(file, maxDim = 1600, quality = 0.85) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = String(reader.result)
-      const comma = result.indexOf(',')
-      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      if (Math.max(width, height) > maxDim) {
+        const scale = maxDim / Math.max(width, height)
+        width = Math.round(width * scale)
+        height = Math.round(height * scale)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+      const dataUrl = canvas.toDataURL('image/jpeg', quality)
+      resolve(dataUrl.slice(dataUrl.indexOf(',') + 1))
     }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('画像の読み込みに失敗しました。')) }
+    img.src = url
   })
 }
 
@@ -147,8 +160,8 @@ export function CardExpenseForm({ onSaved }) {
     setAnalyzing(true)
     setError(null)
     try {
-      const base64 = await fileToBase64(file)
-      const { amount: aiAmount, note: aiNote } = await analyzeReceipt(base64, file.type)
+      const base64 = await downscaleImageToBase64(file)
+      const { amount: aiAmount, note: aiNote } = await analyzeReceipt(base64, 'image/jpeg')
       setAmount(aiAmount ? String(Math.round(aiAmount)) : '')
       setNote(aiNote || '')
       setAiFilled(true)
