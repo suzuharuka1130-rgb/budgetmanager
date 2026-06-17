@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { CARD_TYPES, OTHER_EXPENSE_TYPES, currentYearMonth, toMonthValue, fromMonthValue } from '../lib/helpers'
+import { useState, useEffect } from 'react'
+import { currentYearMonth, toMonthValue, fromMonthValue } from '../lib/helpers'
 import { addIncome, addCardExpense, addOtherExpense, setAccountBalance, uploadReceipt } from '../lib/api'
 import { analyzeReceipt } from '../lib/supabase'
+import { useMeta } from '../lib/meta'
 
 // 画像を縮小して JPEG base64（プレフィックス除去）に変換する。
 // スマホ写真は数MBあり、そのまま送ると Edge Function / Gemini で失敗しやすいため、
@@ -125,8 +126,9 @@ export function IncomeForm({ onSaved }) {
 }
 
 export function CardExpenseForm({ onSaved }) {
+  const { activeCards } = useMeta()
   const [monthVal, setMonthVal] = useMonthState()
-  const [cardType, setCardType] = useState('fixed')
+  const [cardId, setCardId] = useState('')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState(null)
@@ -136,6 +138,11 @@ export function CardExpenseForm({ onSaved }) {
   const [analyzing, setAnalyzing] = useState(false)
   const [aiFilled, setAiFilled] = useState(false)
   const [warning, setWarning] = useState(null)
+
+  // カード一覧読み込み後、未選択なら先頭を選択
+  useEffect(() => {
+    if (!cardId && activeCards.length) setCardId(activeCards[0].id)
+  }, [activeCards, cardId])
 
   function handleFileChange(e) {
     setError(null)
@@ -176,6 +183,7 @@ export function CardExpenseForm({ onSaved }) {
     e.preventDefault()
     const err = validateAmount(amount)
     if (err) return setError(err)
+    if (!cardId) return setError('カードを選択してください。')
     setSubmitting(true)
     setError(null)
     setWarning(null)
@@ -184,13 +192,13 @@ export function CardExpenseForm({ onSaved }) {
       let receiptPath = null
       if (file) {
         try {
-          receiptPath = await uploadReceipt(file, { year, month, card_type: cardType })
+          receiptPath = await uploadReceipt(file, { year, month, card_id: cardId })
         } catch {
           setWarning('画像のアップロードに失敗しました。明細のみ保存します。')
         }
       }
       await addCardExpense({
-        year, month, card_type: cardType, amount: Number(amount),
+        year, month, card_id: cardId, amount: Number(amount),
         note: note || null, receipt_image_url: receiptPath,
       })
       onSaved()
@@ -204,14 +212,23 @@ export function CardExpenseForm({ onSaved }) {
   return (
     <FormShell onSubmit={handleSubmit} submitting={submitting} error={error}>
       <MonthField value={monthVal} onChange={setMonthVal} />
-      <label className="field">
+      <div className="field">
         <span>カード</span>
-        <select value={cardType} onChange={(e) => setCardType(e.target.value)}>
-          {Object.entries(CARD_TYPES).map(([key, { label }]) => (
-            <option key={key} value={key}>{label}</option>
+        <div className="chip-row">
+          {activeCards.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={'chip' + (cardId === c.id ? ' selected' : '')}
+              style={{ '--chip': c.color }}
+              onClick={() => setCardId(c.id)}
+            >
+              <span className="chip-dot" style={{ background: c.color }} />
+              {c.name}
+            </button>
           ))}
-        </select>
-      </label>
+        </div>
+      </div>
 
       <div className="field">
         <span>レシート/明細画像（任意・JPEG/PNG）</span>
@@ -235,22 +252,28 @@ export function CardExpenseForm({ onSaved }) {
 }
 
 export function OtherExpenseForm({ onSaved }) {
+  const { activeOtherTypes } = useMeta()
   const [monthVal, setMonthVal] = useMonthState()
-  const [type, setType] = useState('cash_withdrawal')
+  const [typeId, setTypeId] = useState('')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
+  useEffect(() => {
+    if (!typeId && activeOtherTypes.length) setTypeId(activeOtherTypes[0].id)
+  }, [activeOtherTypes, typeId])
+
   async function handleSubmit(e) {
     e.preventDefault()
     const err = validateAmount(amount)
     if (err) return setError(err)
+    if (!typeId) return setError('種別を選択してください。')
     setSubmitting(true)
     setError(null)
     try {
       const { year, month } = fromMonthValue(monthVal)
-      await addOtherExpense({ year, month, type, amount: Number(amount), note: note || null })
+      await addOtherExpense({ year, month, expense_type_id: typeId, amount: Number(amount), note: note || null })
       onSaved()
     } catch (e2) {
       setError(e2.message || '保存に失敗しました。')
@@ -264,9 +287,9 @@ export function OtherExpenseForm({ onSaved }) {
       <MonthField value={monthVal} onChange={setMonthVal} />
       <label className="field">
         <span>種別</span>
-        <select value={type} onChange={(e) => setType(e.target.value)}>
-          {Object.entries(OTHER_EXPENSE_TYPES).map(([key, { label }]) => (
-            <option key={key} value={key}>{label}</option>
+        <select value={typeId} onChange={(e) => setTypeId(e.target.value)}>
+          {activeOtherTypes.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
       </label>

@@ -1,18 +1,7 @@
 // 日付・通貨フォーマット等のユーティリティ
+// カード/その他支出タイプは cards / other_expense_types テーブルで動的管理（meta.jsx 参照）
 
-export const CARD_TYPES = {
-  fixed: { label: 'STARTS（家賃・光熱費）', short: 'STARTS', color: '#2563eb' }, // blue
-  daily: { label: 'Olive（生活費）', short: 'Olive', color: '#16a34a' },                 // green
-  other: { label: 'Rakuten Pink（娯楽費）', short: 'Rakuten Pink', color: '#db2777' },    // pink
-}
-
-export const OTHER_EXPENSE_TYPES = {
-  cash_withdrawal: { label: '現金引き出し' },
-  transfer: { label: '振込' },
-  other: { label: 'その他' },
-}
-
-export const OTHER_COLOR = '#6b7280' // gray
+export const OTHER_COLOR = '#6b7280' // その他支出（集計）の色
 
 export function formatYen(value) {
   const n = Number(value) || 0

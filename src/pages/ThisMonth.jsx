@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from 'react'
 import { fetchMonth } from '../lib/api'
-import { currentYearMonth, formatYen, monthLabel, sumAmount, CARD_TYPES, OTHER_COLOR } from '../lib/helpers'
+import { currentYearMonth, formatYen, monthLabel, sumAmount, OTHER_COLOR } from '../lib/helpers'
 import { StatCard, Loading, ErrorMsg, EntryList } from '../components/Ui'
 import Modal from '../components/Modal'
 import { IncomeForm, CardExpenseForm, OtherExpenseForm } from '../components/EntryForms'
+import { useMeta } from '../lib/meta'
 
 export default function ThisMonth() {
   const { year, month } = currentYearMonth()
+  const { activeCards } = useMeta()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -35,12 +37,12 @@ export default function ThisMonth() {
   if (error) return <ErrorMsg error={error} />
 
   const totalIncome = sumAmount(data.income)
-  const cardTotals = {
-    fixed: sumAmount(data.cards.filter((c) => c.card_type === 'fixed')),
-    daily: sumAmount(data.cards.filter((c) => c.card_type === 'daily')),
-    other: sumAmount(data.cards.filter((c) => c.card_type === 'other')),
-  }
-  const totalCards = cardTotals.fixed + cardTotals.daily + cardTotals.other
+  // 各アクティブカードの当月合計
+  const cardBreakdown = activeCards.map((c) => ({
+    card: c,
+    total: sumAmount(data.cards.filter((row) => row.card_id === c.id)),
+  }))
+  const totalCards = sumAmount(data.cards)
   const totalOther = sumAmount(data.others)
   const remaining = totalIncome - totalCards - totalOther
 
@@ -74,9 +76,9 @@ export default function ThisMonth() {
 
       <h3 className="section-title">支出内訳</h3>
       <div className="stat-grid">
-        <StatCard label={CARD_TYPES.fixed.label} value={formatYen(cardTotals.fixed)} color={CARD_TYPES.fixed.color} accent />
-        <StatCard label={CARD_TYPES.daily.label} value={formatYen(cardTotals.daily)} color={CARD_TYPES.daily.color} accent />
-        <StatCard label={CARD_TYPES.other.label} value={formatYen(cardTotals.other)} color={CARD_TYPES.other.color} accent />
+        {cardBreakdown.map(({ card, total }) => (
+          <StatCard key={card.id} label={card.name} value={formatYen(total)} color={card.color} accent />
+        ))}
         <StatCard label="その他支出" value={formatYen(totalOther)} color={OTHER_COLOR} accent />
       </div>
 

@@ -38,6 +38,39 @@ async function monthSum(
   return (data ?? []).reduce((s: number, r: { amount: number }) => s + Number(r.amount || 0), 0)
 }
 
+// 各カードの report_group（'housing'=家賃＆生活費 / 'leisure'=娯楽費）に基づき、
+// カードIDをグループ分けして返す。新規カードもそのグループ設定で自動的に集計される。
+async function getGroupCardIds(
+  sb: SupabaseClient,
+): Promise<{ housing: string[]; leisure: string[] }> {
+  const { data, error } = await sb.from('cards').select('id, report_group')
+  if (error) throw error
+  const housing: string[] = []
+  const leisure: string[] = []
+  for (const c of data ?? []) {
+    if (c.report_group === 'housing') housing.push(c.id)
+    else leisure.push(c.id)
+  }
+  return { housing, leisure }
+}
+
+async function cardSum(
+  sb: SupabaseClient,
+  year: number,
+  month: number,
+  cardIds: string[],
+): Promise<number> {
+  if (!cardIds.length) return 0
+  const { data, error } = await sb
+    .from('card_expenses')
+    .select('amount')
+    .eq('year', year)
+    .eq('month', month)
+    .in('card_id', cardIds)
+  if (error) throw error
+  return (data ?? []).reduce((s: number, r: { amount: number }) => s + Number(r.amount || 0), 0)
+}
+
 // 手入力スナップショットを起点に (year, month) 末時点の口座残高を算出する。
 // アプリの計算ロジックと同じく、確定済み明細のみを各月の純増減として積み上げる。
 // スナップショットが無い／対象が最初のスナップショットより前の場合は null。
@@ -102,25 +135,21 @@ export async function buildMonthlyReportMessage(sb: SupabaseClient): Promise<str
   const cur = currentYearMonthJST()
   const last = prevMonth(cur.year, cur.month)
 
+  // カードのグループ分け（report_group）を取得。娯楽費 = leisureカード + その他支出
+  const { housing: housingIds, leisure: leisureIds } = await getGroupCardIds(sb)
+
   // Section 1: 先月の収支サマリー
   const income = await monthSum(sb, 'monthly_income', last.year, last.month)
-  const f1 = await monthSum(sb, 'card_expenses', last.year, last.month, { col: 'card_type', val: 'fixed' })
-  const d1 = await monthSum(sb, 'card_expenses', last.year, last.month, { col: 'card_type', val: 'daily' })
-  const o1 = await monthSum(sb, 'card_expenses', last.year, last.month, { col: 'card_type', val: 'other' })
   const other1 = await monthSum(sb, 'other_expenses', last.year, last.month)
-  // 家賃＆生活費 = Starts + Olive、娯楽費 = Rakuten + その他
-  const housing1 = f1 + d1
-  const leisure1 = o1 + other1
+  const housing1 = await cardSum(sb, last.year, last.month, housingIds)
+  const leisure1 = (await cardSum(sb, last.year, last.month, leisureIds)) + other1
   const totalExpense1 = housing1 + leisure1
   const net = income - totalExpense1
 
   // Section 2: 今月の引き落とし予定（先月利用額 = 今月の対象月で入力された金額）
-  const f2 = await monthSum(sb, 'card_expenses', cur.year, cur.month, { col: 'card_type', val: 'fixed' })
-  const d2 = await monthSum(sb, 'card_expenses', cur.year, cur.month, { col: 'card_type', val: 'daily' })
-  const o2 = await monthSum(sb, 'card_expenses', cur.year, cur.month, { col: 'card_type', val: 'other' })
   const other2 = await monthSum(sb, 'other_expenses', cur.year, cur.month)
-  const housing2 = f2 + d2
-  const leisure2 = o2 + other2
+  const housing2 = await cardSum(sb, cur.year, cur.month, housingIds)
+  const leisure2 = (await cardSum(sb, cur.year, cur.month, leisureIds)) + other2
   const total2 = housing2 + leisure2
 
   // 今月初の口座残高 = 先月末時点の残高

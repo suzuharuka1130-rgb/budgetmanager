@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { hasCredentials, getSession, onAuthChange } from './lib/supabase'
+import { useMeta } from './lib/meta'
 import ThisMonth from './pages/ThisMonth'
 import MonthlyReport from './pages/MonthlyReport'
 import YearlySummary from './pages/YearlySummary'
@@ -74,6 +75,13 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [tab, setTab] = useState('this')
+  const meta = useMeta()
+
+  // 接続・ログインが整ったらマスタ（カード/タイプ/アプリ名）を読み込み直す
+  useEffect(() => {
+    if (connected && session) meta.refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, session])
 
   // 接続情報がある場合、ログイン状態を確認し変化を購読する
   useEffect(() => {
@@ -119,7 +127,7 @@ export default function App() {
         <rect x="27" y="40" width="10" height="14" />
         <rect x="38" y="38" width="7" height="7" />
       </svg>
-      <h1>Haruka ChiChan Kakeibo</h1>
+      <h1>{meta.appTitle}</h1>
     </header>
   )
 

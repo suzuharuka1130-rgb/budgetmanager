@@ -128,11 +128,11 @@ export async function addIncome({ year, month, amount, note }) {
   if (error) throw error
 }
 
-export async function addCardExpense({ year, month, card_type, amount, note, receipt_image_url = null }) {
+export async function addCardExpense({ year, month, card_id, amount, note, receipt_image_url = null }) {
   const confirmed = !isFutureMonth(year, month)
   const { error } = await client()
     .from('card_expenses')
-    .insert({ year, month, card_type, amount, note, confirmed, receipt_image_url })
+    .insert({ year, month, card_id, amount, note, confirmed, receipt_image_url })
   if (error) throw error
 }
 
@@ -140,9 +140,9 @@ export async function addCardExpense({ year, month, card_type, amount, note, rec
 const RECEIPTS_BUCKET = 'receipts'
 
 // 画像をアップロードし、保存パスを返す
-export async function uploadReceipt(file, { year, month, card_type }) {
+export async function uploadReceipt(file, { year, month, card_id }) {
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-  const path = `${year}-${month}-${card_type}-${Date.now()}.${ext}`
+  const path = `${year}-${month}-${card_id}-${Date.now()}.${ext}`
   const { error } = await client().storage.from(RECEIPTS_BUCKET).upload(path, file, {
     contentType: file.type || 'image/jpeg',
     upsert: false,
@@ -158,9 +158,11 @@ export async function getReceiptSignedUrl(path, expiresIn = 60) {
   return data.signedUrl
 }
 
-export async function addOtherExpense({ year, month, type, amount, note }) {
+export async function addOtherExpense({ year, month, expense_type_id, amount, note }) {
   const confirmed = !isFutureMonth(year, month)
-  const { error } = await client().from('other_expenses').insert({ year, month, type, amount, note, confirmed })
+  const { error } = await client()
+    .from('other_expenses')
+    .insert({ year, month, expense_type_id, amount, note, confirmed })
   if (error) throw error
 }
 
@@ -197,6 +199,77 @@ export async function confirmCardExpense(id) {
 
 export async function confirmOtherExpense(id) {
   const { error } = await client().from('other_expenses').update({ confirmed: true }).eq('id', id)
+  if (error) throw error
+}
+
+// ---- カード / その他支出タイプ（マスタ）----
+export async function fetchCards() {
+  const { data, error } = await client().from('cards').select('*').order('display_order')
+  if (error) throw error
+  return data || []
+}
+
+export async function fetchOtherExpenseTypes() {
+  const { data, error } = await client().from('other_expense_types').select('*').order('display_order')
+  if (error) throw error
+  return data || []
+}
+
+async function nextOrder(table) {
+  const { data } = await client().from(table).select('display_order').order('display_order', { ascending: false }).limit(1)
+  return ((data && data[0]?.display_order) || 0) + 1
+}
+
+export async function addCard({ name, color, report_group }) {
+  const display_order = await nextOrder('cards')
+  const row = { name, color, display_order }
+  if (report_group) row.report_group = report_group
+  const { error } = await client().from('cards').insert(row)
+  if (error) throw error
+}
+export async function updateCard(id, { name, color, report_group }) {
+  const patch = { name, color }
+  if (report_group) patch.report_group = report_group
+  const { error } = await client().from('cards').update(patch).eq('id', id)
+  if (error) throw error
+}
+export async function deactivateCard(id) {
+  const { error } = await client().from('cards').update({ is_active: false }).eq('id', id)
+  if (error) throw error
+}
+export async function setCardOrder(id, display_order) {
+  const { error } = await client().from('cards').update({ display_order }).eq('id', id)
+  if (error) throw error
+}
+
+export async function addOtherExpenseType({ name, color }) {
+  const display_order = await nextOrder('other_expense_types')
+  const { error } = await client().from('other_expense_types').insert({ name, color, display_order })
+  if (error) throw error
+}
+export async function updateOtherExpenseType(id, { name, color }) {
+  const { error } = await client().from('other_expense_types').update({ name, color }).eq('id', id)
+  if (error) throw error
+}
+export async function deactivateOtherExpenseType(id) {
+  const { error } = await client().from('other_expense_types').update({ is_active: false }).eq('id', id)
+  if (error) throw error
+}
+export async function setOtherExpenseTypeOrder(id, display_order) {
+  const { error } = await client().from('other_expense_types').update({ display_order }).eq('id', id)
+  if (error) throw error
+}
+
+// ---- アプリ設定 ----
+export async function fetchAppSettings() {
+  const { data, error } = await client().from('app_settings').select('*')
+  if (error) throw error
+  const map = {}
+  for (const row of data || []) map[row.key] = row.value
+  return map
+}
+export async function setAppSetting(key, value) {
+  const { error } = await client().from('app_settings').upsert({ key, value }, { onConflict: 'key' })
   if (error) throw error
 }
 
