@@ -88,6 +88,20 @@ export async function sendMonthlyReport() {
   return data
 }
 
+// analyze-receipt Edge Function を呼び出し、画像から { amount, note } を抽出する
+export async function analyzeReceipt(base64Image, mimeType) {
+  const c = getClient()
+  if (!c) throw new Error('Supabase の接続情報が設定されていません。')
+  const { data, error } = await c.functions.invoke('analyze-receipt', {
+    body: { image: base64Image, mimeType },
+  })
+  if (error) throw error
+  if (!data || typeof data.amount === 'undefined') {
+    throw new Error(data?.error || 'AI読み取りに失敗しました。')
+  }
+  return data // { amount, note }
+}
+
 // ログイン状態の変化を購読。解除用の関数を返す。
 export function onAuthChange(callback) {
   const c = getClient()

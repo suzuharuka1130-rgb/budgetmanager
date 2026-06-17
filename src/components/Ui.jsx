@@ -4,6 +4,7 @@ import { formatYen, CARD_TYPES, OTHER_EXPENSE_TYPES, monthLabel } from '../lib/h
 import {
   deleteIncome, deleteCardExpense, deleteOtherExpense,
   confirmIncome, confirmCardExpense, confirmOtherExpense,
+  getReceiptSignedUrl,
 } from '../lib/api'
 import Modal from './Modal'
 import { Button } from './ui/button'
@@ -33,13 +34,24 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
   const [confirmRow, setConfirmRow] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
   const [confirmingId, setConfirmingId] = useState(null)
+  const [receipt, setReceipt] = useState(null) // { url, loading, error }
 
   const pending = (r) => r.confirmed === false
   const rows = [
     ...income.map((r) => ({ id: 'i' + r.id, dbId: r.id, table: 'income', kind: '入金', label: '入金', amount: r.amount, note: r.note, color: '#0ea5e9', sign: '+', pending: pending(r) })),
-    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: CARD_TYPES[r.card_type]?.label || r.card_type, amount: r.amount, note: r.note, color: CARD_TYPES[r.card_type]?.color, sign: '-', pending: pending(r) })),
+    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: CARD_TYPES[r.card_type]?.label || r.card_type, amount: r.amount, note: r.note, color: CARD_TYPES[r.card_type]?.color, sign: '-', pending: pending(r), receiptPath: r.receipt_image_url })),
     ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: OTHER_EXPENSE_TYPES[r.type]?.label || r.type, amount: r.amount, note: r.note, color: '#6b7280', sign: '-', pending: pending(r) })),
   ]
+
+  async function openReceipt(path) {
+    setReceipt({ url: null, loading: true, error: null })
+    try {
+      const url = await getReceiptSignedUrl(path, 120)
+      setReceipt({ url, loading: false, error: null })
+    } catch (err) {
+      setReceipt({ url: null, loading: false, error: err.message || String(err) })
+    }
+  }
 
   async function performConfirm(r) {
     setConfirmingId(r.id)
@@ -106,6 +118,21 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
               <span className="entry-amount" style={{ color: r.pending ? '#9b9a97' : (r.sign === '+' ? '#0ea5e9' : '#111') }}>
                 {r.sign}{formatYen(r.amount)}
               </span>
+              {r.receiptPath && (
+                <button
+                  type="button"
+                  className="entry-receipt-btn"
+                  onClick={() => openReceipt(r.receiptPath)}
+                  aria-label="レシート画像を表示"
+                  title="レシート画像"
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5L5 21" />
+                  </svg>
+                </button>
+              )}
               {onRefresh && r.pending && (
                 <button
                   type="button"
@@ -156,6 +183,12 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal open={!!receipt} title="レシート画像" onClose={() => setReceipt(null)}>
+        {receipt?.loading && <p className="muted">読み込み中...</p>}
+        {receipt?.error && <p className="form-error">画像の取得に失敗しました: {receipt.error}</p>}
+        {receipt?.url && <img className="receipt-full" src={receipt.url} alt="レシート" />}
       </Modal>
     </>
   )

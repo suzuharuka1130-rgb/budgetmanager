@@ -1,6 +1,36 @@
 import { useState } from 'react'
 import { CARD_TYPES, OTHER_EXPENSE_TYPES, currentYearMonth, toMonthValue, fromMonthValue } from '../lib/helpers'
-import { addIncome, addCardExpense, addOtherExpense, setAccountBalance } from '../lib/api'
+import { addIncome, addCardExpense, addOtherExpense, setAccountBalance, uploadReceipt } from '../lib/api'
+import { analyzeReceipt } from '../lib/supabase'
+
+// 画像を縮小して JPEG base64（プレフィックス除去）に変換する。
+// スマホ写真は数MBあり、そのまま送ると Edge Function / Gemini で失敗しやすいため、
+// 最大辺を maxDim に縮小して送信を軽量・高速・確実にする（OCR精度は十分維持）。
+function downscaleImageToBase64(file, maxDim = 1600, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      if (Math.max(width, height) > maxDim) {
+        const scale = maxDim / Math.max(width, height)
+        width = Math.round(width * scale)
+        height = Math.round(height * scale)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+      const dataUrl = canvas.toDataURL('image/jpeg', quality)
+      resolve(dataUrl.slice(dataUrl.indexOf(',') + 1))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('画像の読み込みに失敗しました。')) }
+    img.src = url
+  })
+}
+
+const MAX_RECEIPT_BYTES = 10 * 1024 * 1024 // 10MB
 
 function useMonthState() {
   const cur = currentYearMonth()
@@ -101,6 +131,46 @@ export function CardExpenseForm({ onSaved }) {
   const [note, setNote] = useState('')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [aiFilled, setAiFilled] = useState(false)
+  const [warning, setWarning] = useState(null)
+
+  function handleFileChange(e) {
+    setError(null)
+    setWarning(null)
+    const f = e.target.files?.[0]
+    if (!f) return
+    if (!['image/jpeg', 'image/png'].includes(f.type)) {
+      setError('JPEGまたはPNG画像を選択してください。')
+      return
+    }
+    if (f.size > MAX_RECEIPT_BYTES) {
+      setError('画像サイズは10MBまでです。')
+      return
+    }
+    setFile(f)
+    setPreviewUrl(URL.createObjectURL(f))
+    setAiFilled(false)
+  }
+
+  async function handleAnalyze() {
+    if (!file) return
+    setAnalyzing(true)
+    setError(null)
+    try {
+      const base64 = await downscaleImageToBase64(file)
+      const { amount: aiAmount, note: aiNote } = await analyzeReceipt(base64, 'image/jpeg')
+      setAmount(aiAmount ? String(Math.round(aiAmount)) : '')
+      setNote(aiNote || '')
+      setAiFilled(true)
+    } catch {
+      setError('AI読み取りに失敗しました。手動で入力してください。')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -108,9 +178,21 @@ export function CardExpenseForm({ onSaved }) {
     if (err) return setError(err)
     setSubmitting(true)
     setError(null)
+    setWarning(null)
     try {
       const { year, month } = fromMonthValue(monthVal)
-      await addCardExpense({ year, month, card_type: cardType, amount: Number(amount), note: note || null })
+      let receiptPath = null
+      if (file) {
+        try {
+          receiptPath = await uploadReceipt(file, { year, month, card_type: cardType })
+        } catch {
+          setWarning('画像のアップロードに失敗しました。明細のみ保存します。')
+        }
+      }
+      await addCardExpense({
+        year, month, card_type: cardType, amount: Number(amount),
+        note: note || null, receipt_image_url: receiptPath,
+      })
       onSaved()
     } catch (e2) {
       setError(e2.message || '保存に失敗しました。')
@@ -130,8 +212,24 @@ export function CardExpenseForm({ onSaved }) {
           ))}
         </select>
       </label>
+
+      <div className="field">
+        <span>レシート/明細画像（任意・JPEG/PNG）</span>
+        <input type="file" accept="image/jpeg,image/png" onChange={handleFileChange} />
+        {previewUrl && (
+          <div className="receipt-preview">
+            <img src={previewUrl} alt="プレビュー" />
+            <button type="button" className="btn" onClick={handleAnalyze} disabled={analyzing}>
+              {analyzing ? '読み取り中...' : 'AIで読み取る'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {aiFilled && <p className="ai-fill-label">AIが読み取った内容（確認・編集してください）</p>}
       <AmountField value={amount} onChange={setAmount} />
       <NoteField value={note} onChange={setNote} />
+      {warning && <p className="form-warning">{warning}</p>}
     </FormShell>
   )
 }

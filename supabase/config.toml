@@ -17,3 +17,7 @@ verify_jwt = false
 
 [functions.monthly-report]
 verify_jwt = false
+
+# ブラウザから呼ぶため検証OFF（関数内でJWT手動検証）
+[functions.analyze-receipt]
+verify_jwt = false
