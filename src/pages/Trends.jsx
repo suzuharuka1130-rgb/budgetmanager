@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchRange, fetchAvailableYears } from '../lib/api'
-import { currentYearMonth, formatYen, sumAmount, CARD_TYPES, netByMonthMap, buildBalanceSeries } from '../lib/helpers'
+import { currentYearMonth, formatYen, sumAmount, netByMonthMap, buildBalanceSeries } from '../lib/helpers'
 import { Loading, ErrorMsg } from '../components/Ui'
+import { useMeta } from '../lib/meta'
 
 // 選択年の1月から、今年なら現在月まで・過去年なら12月までの {year, month} 配列
 function monthsOfYear(year, cur) {
@@ -12,6 +13,7 @@ function monthsOfYear(year, cur) {
 
 export default function Trends() {
   const cur = currentYearMonth()
+  const { cards } = useMeta()
   const [years, setYears] = useState([cur.year])
   const [year, setYear] = useState(cur.year)
   const [data, setData] = useState(null)
@@ -47,9 +49,13 @@ export default function Trends() {
 
   useEffect(() => { load() }, [load])
 
+  // 表示対象カード: アクティブ または期間内にデータがあるカード
+  const relevantCards = data
+    ? cards.filter((c) => c.is_active || data.cards.some((r) => r.card_id === c.id))
+    : []
+
   let balanceSeries = []
   let cardSeries = []
-  let variableSeries = []
 
   if (data) {
     const matchM = (rows, y, m) => rows.filter((r) => r.year === y && r.month === m)
@@ -58,13 +64,13 @@ export default function Trends() {
       name: `${month}月`,
       残高: balance === null ? null : Number(balance),
     }))
-    cardSeries = months.map(({ year, month }) => ({
-      name: `${month}月`,
-      STARTS: sumAmount(matchM(data.cards, year, month).filter((r) => r.card_type === 'fixed')),
-      Olive: sumAmount(matchM(data.cards, year, month).filter((r) => r.card_type === 'daily')),
-      'Rakuten Pink': sumAmount(matchM(data.cards, year, month).filter((r) => r.card_type === 'other')),
-    }))
-    variableSeries = cardSeries.map((r) => ({ name: r.name, 'Rakuten Pink': r['Rakuten Pink'] }))
+    cardSeries = months.map(({ year, month }) => {
+      const row = { name: `${month}月` }
+      for (const c of relevantCards) {
+        row[`c_${c.id}`] = sumAmount(matchM(data.cards, year, month).filter((r) => r.card_id === c.id))
+      }
+      return row
+    })
   }
 
   const yTick = (v) => '¥' + (v / 10000) + '万'
@@ -102,22 +108,10 @@ export default function Trends() {
                 <YAxis tickFormatter={yTick} fontSize={11} width={56} />
                 <Tooltip formatter={(v) => formatYen(v)} />
                 <Legend />
-                <Line type="monotone" dataKey="STARTS" stroke={CARD_TYPES.fixed.color} strokeWidth={2} dot={{ r: 2 }} />
-                <Line type="monotone" dataKey="Olive" stroke={CARD_TYPES.daily.color} strokeWidth={2} dot={{ r: 2 }} />
-                <Line type="monotone" dataKey="Rakuten Pink" stroke={CARD_TYPES.other.color} strokeWidth={2} dot={{ r: 2 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="chart-card">
-            <h3 className="section-title">Rakuten Pink（娯楽費）の推移</h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={variableSeries} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" fontSize={12} />
-                <YAxis tickFormatter={yTick} fontSize={11} width={56} />
-                <Tooltip formatter={(v) => formatYen(v)} />
-                <Line type="monotone" dataKey="Rakuten Pink" stroke={CARD_TYPES.other.color} strokeWidth={2} dot={{ r: 3 }} />
+                {relevantCards.map((c) => (
+                  <Line key={c.id} type="monotone" dataKey={`c_${c.id}`} name={c.name}
+                    stroke={c.color} strokeWidth={2} dot={{ r: 2 }} />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </div>

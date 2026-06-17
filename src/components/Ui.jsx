@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { formatYen, CARD_TYPES, OTHER_EXPENSE_TYPES, monthLabel } from '../lib/helpers'
+import { formatYen, monthLabel } from '../lib/helpers'
 import {
   deleteIncome, deleteCardExpense, deleteOtherExpense,
   confirmIncome, confirmCardExpense, confirmOtherExpense,
   getReceiptSignedUrl,
 } from '../lib/api'
+import { useMeta } from '../lib/meta'
 import Modal from './Modal'
 import { Button } from './ui/button'
 
@@ -30,6 +31,7 @@ export function ErrorMsg({ error }) {
 
 // 月内の全明細を1つのリストにまとめて表示
 export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
+  const { cardName, cardColor, typeName, typeColor } = useMeta()
   const [deletingId, setDeletingId] = useState(null)
   const [confirmRow, setConfirmRow] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
@@ -39,8 +41,8 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
   const pending = (r) => r.confirmed === false
   const rows = [
     ...income.map((r) => ({ id: 'i' + r.id, dbId: r.id, table: 'income', kind: '入金', label: '入金', amount: r.amount, note: r.note, color: '#0ea5e9', sign: '+', pending: pending(r) })),
-    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: CARD_TYPES[r.card_type]?.label || r.card_type, amount: r.amount, note: r.note, color: CARD_TYPES[r.card_type]?.color, sign: '-', pending: pending(r), receiptPath: r.receipt_image_url })),
-    ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: OTHER_EXPENSE_TYPES[r.type]?.label || r.type, amount: r.amount, note: r.note, color: '#6b7280', sign: '-', pending: pending(r) })),
+    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: cardName(r.card_id), amount: r.amount, note: r.note, color: cardColor(r.card_id), sign: '-', pending: pending(r), receiptPath: r.receipt_image_url })),
+    ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: typeName(r.expense_type_id), amount: r.amount, note: r.note, color: typeColor(r.expense_type_id), sign: '-', pending: pending(r) })),
   ]
 
   async function openReceipt(path) {
