@@ -1,10 +1,22 @@
 import { useEffect, useState, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { fetchMonth } from '../lib/api'
 import { currentYearMonth, formatYen, monthLabel, sumAmount, OTHER_COLOR } from '../lib/helpers'
 import { StatCard, Loading, ErrorMsg, EntryList } from '../components/Ui'
 import Modal from '../components/Modal'
 import { IncomeForm, CardExpenseForm, OtherExpenseForm } from '../components/EntryForms'
 import { useMeta } from '../lib/meta'
+
+// アプリ起動後の初回表示でのみ、各セクションを順番にフェードイン表示する
+let introPlayed = false
+const containerVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.04 } },
+}
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+}
 
 export default function ThisMonth() {
   const { year, month } = currentYearMonth()
@@ -13,6 +25,8 @@ export default function ThisMonth() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [modal, setModal] = useState(null) // 'income' | 'card' | 'other'
+  const [playIntro] = useState(() => !introPlayed) // 初回起動時のみアニメーション
+  useEffect(() => { introPlayed = true }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -47,8 +61,13 @@ export default function ThisMonth() {
   const remaining = totalIncome - totalCards - totalOther
 
   return (
-    <div className="page">
-      <div className="hero">
+    <motion.div
+      className="page"
+      variants={containerVariants}
+      initial={playIntro ? 'hidden' : false}
+      animate="show"
+    >
+      <motion.div className="hero" variants={itemVariants}>
         <div className="hero-month">{monthLabel(year, month)}</div>
         <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', marginTop: '6px' }}>
           <div className="hero-remaining" style={{ marginTop: 0 }}>
@@ -63,27 +82,33 @@ export default function ThisMonth() {
           </div>
         </div>
         <div className="hero-sub">入金 {formatYen(totalIncome)} − 支出 {formatYen(totalCards + totalOther)}</div>
-      </div>
+      </motion.div>
 
-      <div className="quick-actions">
+      <motion.div className="quick-actions" variants={itemVariants}>
         <button className="btn primary" onClick={() => setModal('income')}>＋ 入金入力</button>
         <button className="btn" onClick={() => setModal('card')}>＋ カード支出</button>
         <button className="btn" onClick={() => setModal('other')}>＋ その他支出</button>
-      </div>
+      </motion.div>
 
-      <h3 className="section-title">入金</h3>
-      <StatCard label="今月の入金合計" value={formatYen(totalIncome)} color="#0ea5e9" accent layout="row" />
+      <motion.div variants={itemVariants}>
+        <h3 className="section-title">入金</h3>
+        <StatCard label="今月の入金合計" value={formatYen(totalIncome)} color="#0ea5e9" accent layout="row" />
+      </motion.div>
 
-      <h3 className="section-title">支出内訳</h3>
-      <div className="stat-grid">
-        {cardBreakdown.map(({ card, total }) => (
-          <StatCard key={card.id} label={card.name} value={formatYen(total)} color={card.color} accent />
-        ))}
-        <StatCard label="その他支出" value={formatYen(totalOther)} color={OTHER_COLOR} accent />
-      </div>
+      <motion.div variants={itemVariants}>
+        <h3 className="section-title">支出内訳</h3>
+        <div className="stat-grid">
+          {cardBreakdown.map(({ card, total }) => (
+            <StatCard key={card.id} label={card.name} value={formatYen(total)} color={card.color} accent />
+          ))}
+          <StatCard label="その他支出" value={formatYen(totalOther)} color={OTHER_COLOR} accent />
+        </div>
+      </motion.div>
 
-      <h3 className="section-title">明細</h3>
-      <EntryList income={data.income} cards={data.cards} others={data.others} onRefresh={load} />
+      <motion.div variants={itemVariants}>
+        <h3 className="section-title">明細</h3>
+        <EntryList income={data.income} cards={data.cards} others={data.others} onRefresh={load} />
+      </motion.div>
 
       <Modal open={modal === 'income'} title="入金入力" onClose={() => setModal(null)}>
         <IncomeForm onSaved={handleSaved} />
@@ -94,6 +119,6 @@ export default function ThisMonth() {
       <Modal open={modal === 'other'} title="その他支出入力" onClose={() => setModal(null)}>
         <OtherExpenseForm onSaved={handleSaved} />
       </Modal>
-    </div>
+    </motion.div>
   )
 }
