@@ -220,13 +220,17 @@ async function nextOrder(table) {
   return ((data && data[0]?.display_order) || 0) + 1
 }
 
-export async function addCard({ name, color }) {
+export async function addCard({ name, color, report_group }) {
   const display_order = await nextOrder('cards')
-  const { error } = await client().from('cards').insert({ name, color, display_order })
+  const row = { name, color, display_order }
+  if (report_group) row.report_group = report_group
+  const { error } = await client().from('cards').insert(row)
   if (error) throw error
 }
-export async function updateCard(id, { name, color }) {
-  const { error } = await client().from('cards').update({ name, color }).eq('id', id)
+export async function updateCard(id, { name, color, report_group }) {
+  const patch = { name, color }
+  if (report_group) patch.report_group = report_group
+  const { error } = await client().from('cards').update(patch).eq('id', id)
   if (error) throw error
 }
 export async function deactivateCard(id) {

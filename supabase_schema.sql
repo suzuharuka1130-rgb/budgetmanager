@@ -19,6 +19,7 @@ create table if not exists cards (
   color text not null default '#6b7280',
   display_order integer not null default 0,
   is_active boolean not null default true,
+  report_group text not null default 'leisure', -- LINEレポート: 'housing' / 'leisure'
   created_at timestamptz not null default now()
 );
 
@@ -64,10 +65,10 @@ create table if not exists other_expenses (
 );
 
 -- 初期データ（既存の表示名・色）
-insert into cards (id, name, color, display_order) values
-  ('11111111-1111-1111-1111-111111111111', 'STARTS（家賃・ガス・水道・電気）', '#2563eb', 1),
-  ('22222222-2222-2222-2222-222222222222', 'Olive（生活費）',                 '#16a34a', 2),
-  ('33333333-3333-3333-3333-333333333333', 'Rakuten Pink（変動費）',          '#db2777', 3)
+insert into cards (id, name, color, display_order, report_group) values
+  ('11111111-1111-1111-1111-111111111111', 'STARTS（家賃・ガス・水道・電気）', '#2563eb', 1, 'housing'),
+  ('22222222-2222-2222-2222-222222222222', 'Olive（生活費）',                 '#16a34a', 2, 'housing'),
+  ('33333333-3333-3333-3333-333333333333', 'Rakuten Pink（変動費）',          '#db2777', 3, 'leisure')
 on conflict (id) do nothing;
 
 insert into other_expense_types (id, name, color, display_order) values

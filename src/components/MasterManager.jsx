@@ -7,25 +7,30 @@ import { Button } from './ui/button'
 //  title, addLabel, items(アクティブのみ・order順),
 //  api: { add({name,color}), update(id,{name,color}), deactivate(id), setOrder(id, order) },
 //  refresh: () => Promise, deleteWarning: string
-export default function MasterManager({ title, addLabel, items, api, refresh, deleteWarning }) {
+export default function MasterManager({ title, addLabel, items, api, refresh, deleteWarning, groupOptions }) {
   const [editing, setEditing] = useState(null) // null | {} (new) | item (edit)
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3b82f6')
+  const [group, setGroup] = useState(groupOptions?.[0]?.value || '')
   const [formError, setFormError] = useState(null)
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [busyId, setBusyId] = useState(null)
 
+  const groupLabel = (v) => groupOptions?.find((g) => g.value === v)?.label || ''
+
   function openNew() {
     setEditing({})
     setName('')
     setColor('#3b82f6')
+    setGroup(groupOptions?.[0]?.value || '')
     setFormError(null)
   }
   function openEdit(item) {
     setEditing(item)
     setName(item.name)
     setColor(item.color)
+    setGroup(item.report_group || groupOptions?.[0]?.value || '')
     setFormError(null)
   }
 
@@ -37,11 +42,13 @@ export default function MasterManager({ title, addLabel, items, api, refresh, de
     if (dup) return setFormError('同じ名前が既に存在します。')
     setSaving(true)
     setFormError(null)
+    const payload = { name: trimmed, color }
+    if (groupOptions) payload.report_group = group
     try {
       if (editing && editing.id) {
-        await api.update(editing.id, { name: trimmed, color })
+        await api.update(editing.id, payload)
       } else {
-        await api.add({ name: trimmed, color })
+        await api.add(payload)
       }
       await refresh()
       setEditing(null)
@@ -87,7 +94,10 @@ export default function MasterManager({ title, addLabel, items, api, refresh, de
         {items.map((item, i) => (
           <li key={item.id} className="master-row">
             <span className="master-swatch" style={{ background: item.color }} />
-            <span className="master-name">{item.name}</span>
+            <span className="master-name">
+              {item.name}
+              {groupOptions && <span className="master-group">{groupLabel(item.report_group)}</span>}
+            </span>
             <div className="master-actions">
               <button className="icon-btn sm" onClick={() => move(i, -1)} disabled={i === 0 || busyId} title="上へ">▲</button>
               <button className="icon-btn sm" onClick={() => move(i, 1)} disabled={i === items.length - 1 || busyId} title="下へ">▼</button>
@@ -110,6 +120,14 @@ export default function MasterManager({ title, addLabel, items, api, refresh, de
             <span>色</span>
             <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="color-input" />
           </label>
+          {groupOptions && (
+            <label className="field">
+              <span>レポートのグループ</span>
+              <select value={group} onChange={(e) => setGroup(e.target.value)}>
+                {groupOptions.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
+            </label>
+          )}
           {formError && <p className="form-error">{formError}</p>}
           <button type="submit" className="btn primary" disabled={saving}>{saving ? '保存中...' : '保存'}</button>
         </form>

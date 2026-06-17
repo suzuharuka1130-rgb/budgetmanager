@@ -9,8 +9,11 @@ create table if not exists cards (
   color text not null default '#6b7280',
   display_order integer not null default 0,
   is_active boolean not null default true,
+  -- LINEレポートのグループ: 'housing'(家賃＆生活費) / 'leisure'(娯楽費)
+  report_group text not null default 'leisure',
   created_at timestamptz not null default now()
 );
+alter table cards add column if not exists report_group text not null default 'leisure';
 
 create table if not exists other_expense_types (
   id uuid primary key default gen_random_uuid(),
@@ -27,10 +30,10 @@ create table if not exists app_settings (
 );
 
 -- ===== シード（既存表示名・色を維持。固定UUIDでLINEレポートのグルーピングに利用）=====
-insert into cards (id, name, color, display_order) values
-  ('11111111-1111-1111-1111-111111111111', 'STARTS（家賃・ガス・水道・電気）', '#2563eb', 1),
-  ('22222222-2222-2222-2222-222222222222', 'Olive（生活費）',                 '#16a34a', 2),
-  ('33333333-3333-3333-3333-333333333333', 'Rakuten Pink（変動費）',          '#db2777', 3)
+insert into cards (id, name, color, display_order, report_group) values
+  ('11111111-1111-1111-1111-111111111111', 'STARTS（家賃・ガス・水道・電気）', '#2563eb', 1, 'housing'),
+  ('22222222-2222-2222-2222-222222222222', 'Olive（生活費）',                 '#16a34a', 2, 'housing'),
+  ('33333333-3333-3333-3333-333333333333', 'Rakuten Pink（変動費）',          '#db2777', 3, 'leisure')
 on conflict (id) do nothing;
 
 insert into other_expense_types (id, name, color, display_order) values
