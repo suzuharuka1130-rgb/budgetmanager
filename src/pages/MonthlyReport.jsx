@@ -1,10 +1,20 @@
 import { useEffect, useState, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { fetchMonth, fetchAvailableYears } from '../lib/api'
 import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR } from '../lib/helpers'
 import { StatCard, Loading, ErrorMsg, EntryList } from '../components/Ui'
 import { useMeta } from '../lib/meta'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
+
+const containerVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.04 } },
+}
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+}
 
 export default function MonthlyReport() {
   const cur = currentYearMonth()
@@ -60,24 +70,35 @@ export default function MonthlyReport() {
       </div>
 
       {loading ? <Loading /> : error ? <ErrorMsg error={error} /> : (
-        <>
-          <h3 className="section-title">入金・残高</h3>
-          <div className="stat-grid" style={{ marginBottom: '12px' }}>
-            <StatCard label="入金合計" value={formatYen(totalIncome)} color="#0ea5e9" accent />
-            <StatCard label="月間収支" value={formatYen(net)} color={net >= 0 ? '#16a34a' : '#dc2626'} accent />
-          </div>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          style={{ display: 'flex', flexDirection: 'column', gap: 'inherit' }}
+        >
+          <motion.div variants={itemVariants}>
+            <h3 className="section-title">入金・残高</h3>
+            <div className="stat-grid" style={{ marginBottom: '12px' }}>
+              <StatCard label="入金合計" value={formatYen(totalIncome)} color="#0ea5e9" accent />
+              <StatCard label="月間収支" value={formatYen(net)} color={net >= 0 ? '#16a34a' : '#dc2626'} accent />
+            </div>
+          </motion.div>
 
-          <h3 className="section-title">支出内訳</h3>
-          <div className="stat-grid" style={{ marginBottom: '12px' }}>
-            {cardBreakdown.map(({ card, total }) => (
-              <StatCard key={card.id} label={card.name} value={formatYen(total)} color={card.color} accent />
-            ))}
-            <StatCard label="その他支出" value={formatYen(totalOther)} color={OTHER_COLOR} accent />
-          </div>
+          <motion.div variants={itemVariants}>
+            <h3 className="section-title">支出内訳</h3>
+            <div className="stat-grid" style={{ marginBottom: '12px' }}>
+              {cardBreakdown.map(({ card, total }) => (
+                <StatCard key={card.id} label={card.name} value={formatYen(total)} color={card.color} accent />
+              ))}
+              <StatCard label="その他支出" value={formatYen(totalOther)} color={OTHER_COLOR} accent />
+            </div>
+          </motion.div>
 
-          <h3 className="section-title">明細</h3>
-          <EntryList income={data.income} cards={data.cards} others={data.others} onRefresh={load} />
-        </>
+          <motion.div variants={itemVariants}>
+            <h3 className="section-title">明細</h3>
+            <EntryList income={data.income} cards={data.cards} others={data.others} onRefresh={load} />
+          </motion.div>
+        </motion.div>
       )}
     </div>
   )

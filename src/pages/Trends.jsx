@@ -1,9 +1,19 @@
 import { useEffect, useState, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchRange, fetchAvailableYears } from '../lib/api'
 import { currentYearMonth, formatYen, sumAmount, netByMonthMap, buildBalanceSeries } from '../lib/helpers'
 import { Loading, ErrorMsg } from '../components/Ui'
 import { useMeta } from '../lib/meta'
+
+const containerVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.04 } },
+}
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+}
 
 // 選択年の1月から、今年なら現在月まで・過去年なら12月までの {year, month} 配列
 function monthsOfYear(year, cur) {
@@ -47,6 +57,16 @@ export default function Trends() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year])
 
+  const [showChart, setShowChart] = useState(false)
+  useEffect(() => {
+    if (!loading && data) {
+      const t = setTimeout(() => setShowChart(true), 300)
+      return () => clearTimeout(t)
+    } else {
+      setShowChart(false)
+    }
+  }, [loading, data])
+
   useEffect(() => { load() }, [load])
 
   // 表示対象カード: アクティブ または期間内にデータがあるカード
@@ -85,37 +105,50 @@ export default function Trends() {
       </div>
 
       {loading ? <Loading /> : error ? <ErrorMsg error={error} /> : (
-        <>
-          <div className="chart-card">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          style={{ display: 'flex', flexDirection: 'column', gap: 'inherit' }}
+        >
+          <motion.div className="chart-card" variants={itemVariants}>
             <h3 className="section-title">口座残高の推移</h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={balanceSeries} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" fontSize={12} />
-                <YAxis tickFormatter={yTick} fontSize={11} width={56} />
-                <Tooltip formatter={(v) => formatYen(v)} />
-                <Line type="monotone" dataKey="残高" stroke="#0ea5e9" strokeWidth={2} connectNulls dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+            {showChart ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={balanceSeries} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" fontSize={12} />
+                  <YAxis tickFormatter={yTick} fontSize={11} width={56} />
+                  <Tooltip formatter={(v) => formatYen(v)} />
+                  <Line type="monotone" dataKey="残高" stroke="#0ea5e9" strokeWidth={2} connectNulls dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: 280 }} />
+            )}
+          </motion.div>
 
-          <div className="chart-card">
+          <motion.div className="chart-card" variants={itemVariants}>
             <h3 className="section-title">カード別支出の推移</h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={cardSeries} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" fontSize={12} />
-                <YAxis tickFormatter={yTick} fontSize={11} width={56} />
-                <Tooltip formatter={(v) => formatYen(v)} />
-                <Legend />
-                {relevantCards.map((c) => (
-                  <Line key={c.id} type="monotone" dataKey={`c_${c.id}`} name={c.name}
-                    stroke={c.color} strokeWidth={2} dot={{ r: 2 }} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </>
+            {showChart ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={cardSeries} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" fontSize={12} />
+                  <YAxis tickFormatter={yTick} fontSize={11} width={56} />
+                  <Tooltip formatter={(v) => formatYen(v)} />
+                  <Legend />
+                  {relevantCards.map((c) => (
+                    <Line key={c.id} type="monotone" dataKey={`c_${c.id}`} name={c.name}
+                      stroke={c.color} strokeWidth={2} dot={{ r: 2 }} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: 280 }} />
+            )}
+          </motion.div>
+        </motion.div>
       )}
     </div>
   )
