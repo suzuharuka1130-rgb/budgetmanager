@@ -7,8 +7,6 @@ import Modal from '../components/Modal'
 import { IncomeForm, CardExpenseForm, OtherExpenseForm } from '../components/EntryForms'
 import { useMeta } from '../lib/meta'
 
-// アプリ起動後の初回表示でのみ、各セクションを順番にフェードイン表示する
-let introPlayed = false
 const containerVariants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.09, delayChildren: 0.04 } },
@@ -25,8 +23,6 @@ export default function ThisMonth() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [modal, setModal] = useState(null) // 'income' | 'card' | 'other'
-  const [playIntro] = useState(() => !introPlayed) // 初回起動時のみアニメーション
-  useEffect(() => { introPlayed = true }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -64,7 +60,7 @@ export default function ThisMonth() {
     <motion.div
       className="page"
       variants={containerVariants}
-      initial={playIntro ? 'hidden' : false}
+      initial="hidden"
       animate="show"
     >
       <motion.div className="hero" variants={itemVariants}>

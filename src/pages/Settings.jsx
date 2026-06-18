@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { getCredentials, saveCredentials, signOut, hasEnvCredentials, sendMonthlyReport, getSession } from '../lib/supabase'
 import {
   fetchNotificationPreferences, upsertNotificationPreferences, setAppSetting,
@@ -9,6 +10,15 @@ import Modal from '../components/Modal'
 import { BalanceForm } from '../components/EntryForms'
 import MasterManager from '../components/MasterManager'
 import { useMeta } from '../lib/meta'
+
+const containerVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.04 } },
+}
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+}
 
 export default function Settings({ onCredentialsChange }) {
   const initial = getCredentials()
@@ -107,10 +117,15 @@ export default function Settings({ onCredentialsChange }) {
   const connected = Boolean(initial.url && initial.anonKey)
 
   return (
-    <div className="page">
+    <motion.div
+      className="page"
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+    >
       <h2 className="page-title">設定</h2>
 
-      <div className="card">
+      <motion.div className="card" variants={itemVariants}>
         <h3 className="section-title">アプリ名設定</h3>
         <form className="entry-form" onSubmit={handleTitleSave}>
           <label className="field">
@@ -120,31 +135,35 @@ export default function Settings({ onCredentialsChange }) {
           <button type="submit" className="btn primary" disabled={!connected}>保存</button>
           {titleSaved && <p className="form-ok">保存しました。</p>}
         </form>
-      </div>
+      </motion.div>
 
-      <MasterManager
-        title="カード管理"
-        addLabel="＋ カードを追加"
-        items={meta.activeCards}
-        api={{ add: addCard, update: updateCard, deactivate: deactivateCard, setOrder: setCardOrder }}
-        refresh={meta.refresh}
-        deleteWarning="既存の支出記録はこのカードを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
-        groupOptions={[
-          { value: 'housing', label: '家賃＆生活費' },
-          { value: 'leisure', label: '娯楽費' },
-        ]}
-      />
+      <motion.div variants={itemVariants}>
+        <MasterManager
+          title="カード管理"
+          addLabel="＋ カードを追加"
+          items={meta.activeCards}
+          api={{ add: addCard, update: updateCard, deactivate: deactivateCard, setOrder: setCardOrder }}
+          refresh={meta.refresh}
+          deleteWarning="既存の支出記録はこのカードを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
+          groupOptions={[
+            { value: 'housing', label: '家賃＆生活費' },
+            { value: 'leisure', label: '娯楽費' },
+          ]}
+        />
+      </motion.div>
 
-      <MasterManager
-        title="その他支出タイプ管理"
-        addLabel="＋ タイプを追加"
-        items={meta.activeOtherTypes}
-        api={{ add: addOtherExpenseType, update: updateOtherExpenseType, deactivate: deactivateOtherExpenseType, setOrder: setOtherExpenseTypeOrder }}
-        refresh={meta.refresh}
-        deleteWarning="既存の記録はこのタイプを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
-      />
+      <motion.div variants={itemVariants}>
+        <MasterManager
+          title="その他支出タイプ管理"
+          addLabel="＋ タイプを追加"
+          items={meta.activeOtherTypes}
+          api={{ add: addOtherExpenseType, update: updateOtherExpenseType, deactivate: deactivateOtherExpenseType, setOrder: setOtherExpenseTypeOrder }}
+          refresh={meta.refresh}
+          deleteWarning="既存の記録はこのタイプを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
+        />
+      </motion.div>
 
-      <div className="card">
+      <motion.div className="card" variants={itemVariants}>
         <h3 className="section-title">LINE通知</h3>
         <p className="muted small">受け取るLINE通知を選択してください。</p>
         {notifyLoading ? (
@@ -191,9 +210,9 @@ export default function Settings({ onCredentialsChange }) {
         {lineResult && (
           <p className={lineResult.ok ? 'form-ok' : 'form-error'}>{lineResult.text}</p>
         )}
-      </div>
+      </motion.div>
 
-      <div className="card">
+      <motion.div className="card" variants={itemVariants}>
         <h3 className="section-title">口座残高スナップショット</h3>
         <p className="muted small">
           実際の口座残高を手入力で記録します（トレンドの残高グラフに反映されます）。
@@ -203,9 +222,9 @@ export default function Settings({ onCredentialsChange }) {
           口座残高を入力
         </button>
         {!connected && <p className="muted small">※ 先に Supabase 接続情報を保存してください。</p>}
-      </div>
+      </motion.div>
 
-      <div className="card">
+      <motion.div className="card" variants={itemVariants}>
         <h3 className="section-title">Supabase 接続情報</h3>
         {hasEnvCredentials() ? (
           <p className="muted small">
@@ -235,17 +254,17 @@ export default function Settings({ onCredentialsChange }) {
             </form>
           </>
         )}
-      </div>
+      </motion.div>
 
-      <div className="card">
+      <motion.div className="card" variants={itemVariants}>
         <h3 className="section-title">アカウント</h3>
         <p className="muted small">ログアウトするとログイン画面に戻ります。</p>
         <button className="btn" onClick={() => signOut()}>ログアウト</button>
-      </div>
+      </motion.div>
 
       <Modal open={showBalance} title="口座残高の入力" onClose={() => setShowBalance(false)}>
         <BalanceForm onSaved={() => setShowBalance(false)} />
       </Modal>
-    </div>
+    </motion.div>
   )
 }
