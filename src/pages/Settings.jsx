@@ -212,32 +212,6 @@ export default function Settings({ onCredentialsChange }) {
         {inviteCode && <p className="form-ok">招待コード: <strong>{inviteCode}</strong></p>}
       </motion.div>
 
-      <motion.div variants={itemVariants}>
-        <MasterManager
-          title="カード管理"
-          addLabel="＋ カードを追加"
-          items={meta.activeCards}
-          api={{ add: addCard, update: updateCard, deactivate: deactivateCard, setOrder: setCardOrder }}
-          refresh={meta.refresh}
-          deleteWarning="既存の支出記録はこのカードを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
-          groupOptions={[
-            { value: 'housing', label: '家賃＆生活費' },
-            { value: 'leisure', label: '娯楽費' },
-          ]}
-        />
-      </motion.div>
-
-      <motion.div variants={itemVariants}>
-        <MasterManager
-          title="その他支出タイプ管理"
-          addLabel="＋ タイプを追加"
-          items={meta.activeOtherTypes}
-          api={{ add: addOtherExpenseType, update: updateOtherExpenseType, deactivate: deactivateOtherExpenseType, setOrder: setOtherExpenseTypeOrder }}
-          refresh={meta.refresh}
-          deleteWarning="既存の記録はこのタイプを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
-        />
-      </motion.div>
-
       <motion.div className="card" variants={itemVariants}>
         <h3 className="section-title">LINE通知</h3>
         <p className="muted small">受け取るLINE通知を選択してください。</p>
@@ -285,6 +259,32 @@ export default function Settings({ onCredentialsChange }) {
         {lineResult && (
           <p className={lineResult.ok ? 'form-ok' : 'form-error'}>{lineResult.text}</p>
         )}
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <MasterManager
+          title="カード管理"
+          addLabel="＋ カードを追加"
+          items={meta.activeCards}
+          api={{ add: addCard, update: updateCard, deactivate: deactivateCard, setOrder: setCardOrder }}
+          refresh={meta.refresh}
+          deleteWarning="既存の支出記録はこのカードを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
+          groupOptions={[
+            { value: 'housing', label: '家賃＆生活費' },
+            { value: 'leisure', label: '娯楽費' },
+          ]}
+        />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <MasterManager
+          title="その他支出タイプ管理"
+          addLabel="＋ タイプを追加"
+          items={meta.activeOtherTypes}
+          api={{ add: addOtherExpenseType, update: updateOtherExpenseType, deactivate: deactivateOtherExpenseType, setOrder: setOtherExpenseTypeOrder }}
+          refresh={meta.refresh}
+          deleteWarning="既存の記録はこのタイプを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
+        />
       </motion.div>
 
       <motion.div className="card" variants={itemVariants}>
