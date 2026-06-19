@@ -242,13 +242,17 @@ export async function setCardOrder(id, display_order) {
   if (error) throw error
 }
 
-export async function addOtherExpenseType({ name, color }) {
+export async function addOtherExpenseType({ name, color, report_group }) {
   const display_order = await nextOrder('other_expense_types')
-  const { error } = await client().from('other_expense_types').insert({ name, color, display_order })
+  const row = { name, color, display_order }
+  if (report_group) row.report_group = report_group
+  const { error } = await client().from('other_expense_types').insert(row)
   if (error) throw error
 }
-export async function updateOtherExpenseType(id, { name, color }) {
-  const { error } = await client().from('other_expense_types').update({ name, color }).eq('id', id)
+export async function updateOtherExpenseType(id, { name, color, report_group }) {
+  const patch = { name, color }
+  if (report_group) patch.report_group = report_group
+  const { error } = await client().from('other_expense_types').update(patch).eq('id', id)
   if (error) throw error
 }
 export async function deactivateOtherExpenseType(id) {
