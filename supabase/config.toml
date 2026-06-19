@@ -21,3 +21,7 @@ verify_jwt = false
 # ブラウザから呼ぶため検証OFF（関数内でJWT手動検証）
 [functions.analyze-receipt]
 verify_jwt = false
+
+# LINE が呼ぶため検証OFF（x-line-signature で検証）
+[functions.line-webhook]
+verify_jwt = false

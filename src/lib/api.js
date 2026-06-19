@@ -268,8 +268,39 @@ export async function fetchAppSettings() {
   for (const row of data || []) map[row.key] = row.value
   return map
 }
-export async function setAppSetting(key, value) {
-  const { error } = await client().from('app_settings').upsert({ key, value }, { onConflict: 'key' })
+export async function setAppSetting(key, value, householdId) {
+  const row = { key, value }
+  if (householdId) row.household_id = householdId
+  const { error } = await client().from('app_settings').upsert(row, { onConflict: 'household_id,key' })
+  if (error) throw error
+}
+
+// ---- 世帯（マルチテナント）----
+export async function createHousehold(name) {
+  const { data, error } = await client().rpc('create_household', { p_name: name || '' })
+  if (error) throw error
+  return data // household_id
+}
+export async function redeemInvite(code) {
+  const { data, error } = await client().rpc('redeem_invite', { p_code: code })
+  if (error) throw error
+  return data // household_id
+}
+export async function createInvite() {
+  const { data, error } = await client().rpc('create_invite')
+  if (error) throw error
+  return data // code
+}
+export async function createLineLinkCode() {
+  const { data, error } = await client().rpc('create_line_link_code')
+  if (error) throw error
+  return data // code
+}
+export async function setMyLineUserId(userId, lineUserId) {
+  const { error } = await client()
+    .from('household_members')
+    .update({ line_user_id: lineUserId || null })
+    .eq('user_id', userId)
   if (error) throw error
 }
 
