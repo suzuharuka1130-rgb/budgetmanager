@@ -39,24 +39,54 @@ async function monthSum(
   return (data ?? []).reduce((s: number, r: { amount: number }) => s + Number(r.amount || 0), 0)
 }
 
-// カードを report_group（ラベル）ごとにまとめる。表示順は各グループ内の最小 display_order。
-async function getCardGroups(
+// カードとその他支出タイプを report_group（ラベル）ごとにまとめる。
+// 表示順は各グループ内の最小 display_order（カードを優先）。
+async function getReportGroups(
   sb: SupabaseClient,
   hid: string,
-): Promise<{ group: string; cardIds: string[] }[]> {
-  const { data, error } = await sb.from('cards').select('id, report_group, display_order').eq('household_id', hid)
-  if (error) throw error
-  const map = new Map<string, { cardIds: string[]; order: number }>()
-  for (const c of data ?? []) {
-    const g = c.report_group || 'その他カード'
-    if (!map.has(g)) map.set(g, { cardIds: [], order: c.display_order ?? 9999 })
-    const e = map.get(g)!
-    e.cardIds.push(c.id)
-    e.order = Math.min(e.order, c.display_order ?? 9999)
+): Promise<{ group: string; cardIds: string[]; typeIds: string[] }[]> {
+  const [{ data: cards }, { data: types }] = await Promise.all([
+    sb.from('cards').select('id, report_group, display_order').eq('household_id', hid),
+    sb.from('other_expense_types').select('id, report_group, display_order').eq('household_id', hid),
+  ])
+  const map = new Map<string, { cardIds: string[]; typeIds: string[]; order: number }>()
+  const ensure = (g: string, order: number) => {
+    if (!map.has(g)) map.set(g, { cardIds: [], typeIds: [], order })
+    else map.get(g)!.order = Math.min(map.get(g)!.order, order)
+  }
+  for (const c of cards ?? []) {
+    const g = c.report_group || '未分類'
+    ensure(g, c.display_order ?? 9999)
+    map.get(g)!.cardIds.push(c.id)
+  }
+  for (const t of types ?? []) {
+    const g = t.report_group || '娯楽費'
+    ensure(g, (t.display_order ?? 9999) + 1000) // カードを優先表示
+    map.get(g)!.typeIds.push(t.id)
   }
   return [...map.entries()]
     .sort((a, b) => a[1].order - b[1].order)
-    .map(([group, v]) => ({ group, cardIds: v.cardIds }))
+    .map(([group, v]) => ({ group, cardIds: v.cardIds, typeIds: v.typeIds }))
+}
+
+// 指定タイプ群の その他支出 合計
+async function otherTypeSum(
+  sb: SupabaseClient,
+  hid: string,
+  year: number,
+  month: number,
+  typeIds: string[],
+): Promise<number> {
+  if (!typeIds.length) return 0
+  const { data, error } = await sb
+    .from('other_expenses')
+    .select('amount')
+    .eq('household_id', hid)
+    .eq('year', year)
+    .eq('month', month)
+    .in('expense_type_id', typeIds)
+  if (error) throw error
+  return (data ?? []).reduce((s: number, r: { amount: number }) => s + Number(r.amount || 0), 0)
 }
 
 async function cardSum(
@@ -143,26 +173,29 @@ export async function buildMonthlyReportMessage(sb: SupabaseClient, hid: string)
   const cur = currentYearMonthJST()
   const last = prevMonth(cur.year, cur.month)
 
-  // カードを report_group（ラベル）ごとに集計
-  const groups = await getCardGroups(sb, hid)
+  // カード＋その他支出タイプを report_group ごとに集計
+  const groups = await getReportGroups(sb, hid)
+
+  // 各グループの合計 = グループ内カード + グループ内その他タイプ
+  async function groupSums(year: number, month: number) {
+    const out = []
+    for (const g of groups) {
+      const amt = (await cardSum(sb, hid, year, month, g.cardIds))
+        + (await otherTypeSum(sb, hid, year, month, g.typeIds))
+      out.push({ name: g.group, amt })
+    }
+    return out
+  }
 
   // Section 1: 先月の収支サマリー
   const income = await monthSum(sb, 'monthly_income', hid, last.year, last.month)
-  const other1 = await monthSum(sb, 'other_expenses', hid, last.year, last.month)
-  const groupSums1 = []
-  for (const g of groups) {
-    groupSums1.push({ name: g.group, amt: await cardSum(sb, hid, last.year, last.month, g.cardIds) })
-  }
-  const totalExpense1 = groupSums1.reduce((s, x) => s + x.amt, 0) + other1
+  const sums1 = await groupSums(last.year, last.month)
+  const totalExpense1 = sums1.reduce((s, x) => s + x.amt, 0)
   const net = income - totalExpense1
 
   // Section 2: 今月の引き落とし予定（先月利用額 = 今月の対象月で入力された金額）
-  const other2 = await monthSum(sb, 'other_expenses', hid, cur.year, cur.month)
-  const groupSums2 = []
-  for (const g of groups) {
-    groupSums2.push({ name: g.group, amt: await cardSum(sb, hid, cur.year, cur.month, g.cardIds) })
-  }
-  const total2 = groupSums2.reduce((s, x) => s + x.amt, 0) + other2
+  const sums2 = await groupSums(cur.year, cur.month)
+  const total2 = sums2.reduce((s, x) => s + x.amt, 0)
 
   // 今月初の口座残高 = 先月末時点の残高
   const balance = await computeBalanceThrough(sb, hid, last.year, last.month)
@@ -173,16 +206,14 @@ export async function buildMonthlyReportMessage(sb: SupabaseClient, hid: string)
     DIVIDER,
     `【${last.month}月の収支】`,
     `➕ 入金合計：${yen(income)}`,
-    ...groupSums1.map((g) => `➖ ${g.name}：${yen(g.amt)}`),
-    `➖ その他：${yen(other1)}`,
+    ...sums1.map((g) => `➖ ${g.name}：${yen(g.amt)}`),
     `💸 支出合計：${yen(totalExpense1)}`,
     `✅ 収支：${yen(net)}`,
     '',
     `🏦 支払後口座残高：${balanceText}`,
     DIVIDER,
     `【${cur.month}月引き落とし予定】`,
-    ...groupSums2.map((g) => `➖ ${g.name}：${yen(g.amt)}`),
-    `➖ その他：${yen(other2)}`,
+    ...sums2.map((g) => `➖ ${g.name}：${yen(g.amt)}`),
     `💳 支出合計：${yen(total2)}`,
   ]
   return lines.join('\n')
