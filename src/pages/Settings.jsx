@@ -42,6 +42,12 @@ export default function Settings({ onCredentialsChange }) {
 
   const myMember = household.members.find((m) => m.user_id === userId)
 
+  // レポートグループの選択肢 = 既定 + 既存カードで使われているグループ
+  const reportGroupOptions = [...new Set([
+    '家賃＆生活費', '娯楽費',
+    ...meta.cards.map((c) => c.report_group).filter(Boolean),
+  ])].map((g) => ({ value: g, label: g }))
+
   async function handleInvite() {
     setMemberBusy(true)
     try { setInviteCode(await createInvite()) } catch { /* ignore */ } finally { setMemberBusy(false) }
@@ -269,10 +275,7 @@ export default function Settings({ onCredentialsChange }) {
           api={{ add: addCard, update: updateCard, deactivate: deactivateCard, setOrder: setCardOrder }}
           refresh={meta.refresh}
           deleteWarning="既存の支出記録はこのカードを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
-          groupOptions={[
-            { value: 'housing', label: '家賃＆生活費' },
-            { value: 'leisure', label: '娯楽費' },
-          ]}
+          groupOptions={reportGroupOptions}
         />
       </motion.div>
 

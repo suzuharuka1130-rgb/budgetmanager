@@ -12,6 +12,7 @@ export default function MasterManager({ title, addLabel, items, api, refresh, de
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3b82f6')
   const [group, setGroup] = useState(groupOptions?.[0]?.value || '')
+  const [customGroup, setCustomGroup] = useState('')
   const [formError, setFormError] = useState(null)
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
@@ -24,13 +25,17 @@ export default function MasterManager({ title, addLabel, items, api, refresh, de
     setName('')
     setColor('#3b82f6')
     setGroup(groupOptions?.[0]?.value || '')
+    setCustomGroup('')
     setFormError(null)
   }
   function openEdit(item) {
     setEditing(item)
     setName(item.name)
     setColor(item.color)
-    setGroup(item.report_group || groupOptions?.[0]?.value || '')
+    // 既存値が選択肢に無ければ（カスタム）新規入力モードにする
+    const known = groupOptions?.some((g) => g.value === item.report_group)
+    setGroup(item.report_group && known ? item.report_group : (item.report_group ? '__new__' : (groupOptions?.[0]?.value || '')))
+    setCustomGroup(item.report_group && !known ? item.report_group : '')
     setFormError(null)
   }
 
@@ -40,10 +45,15 @@ export default function MasterManager({ title, addLabel, items, api, refresh, de
     if (!trimmed) return setFormError('名前を入力してください。')
     const dup = items.some((i) => i.name === trimmed && i.id !== editing?.id)
     if (dup) return setFormError('同じ名前が既に存在します。')
+    let groupValue = group
+    if (groupOptions && group === '__new__') {
+      groupValue = customGroup.trim()
+      if (!groupValue) return setFormError('新しいグループ名を入力してください。')
+    }
     setSaving(true)
     setFormError(null)
     const payload = { name: trimmed, color }
-    if (groupOptions) payload.report_group = group
+    if (groupOptions) payload.report_group = groupValue
     try {
       if (editing && editing.id) {
         await api.update(editing.id, payload)
@@ -125,7 +135,14 @@ export default function MasterManager({ title, addLabel, items, api, refresh, de
               <span>レポートのグループ</span>
               <select value={group} onChange={(e) => setGroup(e.target.value)}>
                 {groupOptions.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+                <option value="__new__">＋ 新しいグループを作成…</option>
               </select>
+            </label>
+          )}
+          {groupOptions && group === '__new__' && (
+            <label className="field">
+              <span>新しいグループ名</span>
+              <input type="text" value={customGroup} onChange={(e) => setCustomGroup(e.target.value)} placeholder="例: 教育費" />
             </label>
           )}
           {formError && <p className="form-error">{formError}</p>}
