@@ -1,37 +1,24 @@
 // 毎月1日 9:00 JST（0:00 UTC）— 月次レポート
-// 先月の収支サマリー + 今月の引き落とし予定 を LINE へ送信する。
-// cron からの起動に加え、設定画面のテスト送信ボタン（ブラウザ）からも呼べるよう CORS 対応。
-// レスポンスには家計データ本文（message）を含めない（情報漏えい防止）。
+// cron: 全世帯をループし、各世帯のレポートを各世帯のメンバーのLINEへ送信。
+// test=true（設定画面）: 呼び出しユーザーの世帯のみ、本人に送信。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { sendLineMessage, getFilteredLineUserIds } from '../_shared/line.ts'
+import { sendLineMessage, listHouseholdIds, householdLineRecipients } from '../_shared/line.ts'
 import { buildMonthlyReportMessage, getServiceClient } from '../_shared/report.ts'
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 
-// メールアドレスからLINEユーザーIDへのマッピング
-function getLineUserIdForEmail(email: string): string | undefined {
-  const me = Deno.env.get('LINE_USER_ID_ME')?.trim()
-  const wife = Deno.env.get('LINE_USER_ID_WIFE')?.trim()
-  const meEmail = (Deno.env.get('USER_EMAIL_ME') || 'suzu.haruka1130@gmail.com').trim().toLowerCase()
-  const wifeEmail = (Deno.env.get('USER_EMAIL_WIFE') || '').trim().toLowerCase()
-
-  const normalized = email.trim().toLowerCase()
-  if (normalized === meEmail) return me
-  if (wifeEmail && normalized === wifeEmail) return wife
-  return me // fallback to ME
-}
-
-// リクエストからユーザーのメールアドレスを取得
-async function getUserEmail(req: Request): Promise<string | null> {
-  const authHeader = req.headers.get('Authorization') ?? ''
-  if (!authHeader) return null
-  const supabase = createClient(
+// 呼び出しユーザーの世帯IDを取得（JWT検証 → household_members）
+async function callerHouseholdId(req: Request, sb: ReturnType<typeof getServiceClient>): Promise<string | null> {
+  const auth = req.headers.get('Authorization') ?? ''
+  if (!auth) return null
+  const anon = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    { global: { headers: { Authorization: authHeader } } },
+    { global: { headers: { Authorization: auth } } },
   )
-  const { data, error } = await supabase.auth.getUser()
+  const { data, error } = await anon.auth.getUser()
   if (error || !data?.user) return null
-  return data.user.email ?? null
+  const { data: mem } = await sb.from('household_members').select('household_id').eq('user_id', data.user.id).limit(1)
+  return mem?.[0]?.household_id ?? null
 }
 
 Deno.serve(async (req) => {
@@ -40,36 +27,31 @@ Deno.serve(async (req) => {
   }
   try {
     const body = await req.json().catch(() => ({}))
-
-    // body.test === true（設定画面 of テスト送信）のときはリクエスト者のLINEのみに送る。
-    // cron は body '{}' なので両者へ送信される。
-    let userIds: string[] | undefined = undefined
-    if (body?.test === true) {
-      const email = await getUserEmail(req)
-      if (email) {
-        const lineId = getLineUserIdForEmail(email)
-        if (lineId) userIds = [lineId]
-      } else {
-        const me = Deno.env.get('LINE_USER_ID_ME')?.trim()
-        if (me) userIds = [me]
-      }
-    } else {
-      userIds = await getFilteredLineUserIds('monthly_report')
-      if (userIds.length === 0) {
-        return jsonResponse({ success: true, skipped: true, reason: 'すべてのユーザーがこの通知をオフに設定しています。' })
-      }
-    }
-
     const sb = getServiceClient()
-    const message = await buildMonthlyReportMessage(sb)
 
-    // dryRun=true のときは送信しない（本文は返さない）
-    if (body?.dryRun === true) {
-      return jsonResponse({ success: true, dryRun: true })
+    // テスト送信: 呼び出しユーザーの世帯のみ、本人（または env フォールバック）に送信
+    if (body?.test === true) {
+      const hid = await callerHouseholdId(req, sb)
+      if (!hid) return jsonResponse({ error: '世帯が見つかりません。' }, 400)
+      const message = await buildMonthlyReportMessage(sb, hid)
+      const recips = await householdLineRecipients(sb, hid, 'monthly_report')
+      const me = Deno.env.get('LINE_USER_ID_ME')?.trim()
+      const target = recips.length ? recips : (me ? [me] : [])
+      const results = await sendLineMessage('（テスト送信）\n' + message, target)
+      return jsonResponse({ success: results.every((r) => r.ok), results })
     }
 
-    const results = await sendLineMessage(message, userIds)
-    return jsonResponse({ success: results.every((r) => r.ok), results })
+    // cron: 全世帯
+    const hids = await listHouseholdIds(sb)
+    let sent = 0
+    for (const hid of hids) {
+      const recips = await householdLineRecipients(sb, hid, 'monthly_report')
+      if (!recips.length) continue
+      const message = await buildMonthlyReportMessage(sb, hid)
+      await sendLineMessage(message, recips)
+      sent += 1
+    }
+    return jsonResponse({ success: true, households: hids.length, sent })
   } catch (e) {
     return jsonResponse({ error: String((e as Error)?.message ?? e) }, 500)
   }

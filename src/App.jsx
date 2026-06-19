@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { hasCredentials, getSession, onAuthChange } from './lib/supabase'
 import { useMeta } from './lib/meta'
+import { useHousehold } from './lib/household'
+import HouseholdOnboarding from './pages/HouseholdOnboarding'
 import ThisMonth from './pages/ThisMonth'
 import MonthlyReport from './pages/MonthlyReport'
 import YearlySummary from './pages/YearlySummary'
@@ -76,12 +78,21 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false)
   const [tab, setTab] = useState('this')
   const meta = useMeta()
+  const household = useHousehold()
 
-  // 接続・ログインが整ったらマスタ（カード/タイプ/アプリ名）を読み込み直す
+  // 接続・ログインが整ったら世帯とマスタを読み込み直す
   useEffect(() => {
-    if (connected && session) meta.refresh()
+    if (connected && session) {
+      household.refresh()
+      meta.refresh()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, session])
+
+  async function handleHouseholdJoined() {
+    await household.refresh()
+    await meta.refresh()
+  }
 
   // 接続情報がある場合、ログイン状態を確認し変化を購読する
   useEffect(() => {
@@ -153,7 +164,29 @@ export default function App() {
     )
   }
 
-  // ログイン済み → アプリ本体
+  // 世帯の確認中
+  if (household.loading || household.householdId === undefined) {
+    return (
+      <div className="app">
+        {header}
+        <main className="app-main"><div className="state-msg">読み込み中...</div></main>
+      </div>
+    )
+  }
+
+  // 世帯未所属 → 招待コード入力 or 新規作成
+  if (!household.hasHousehold) {
+    return (
+      <div className="app">
+        {header}
+        <main className="app-main">
+          <HouseholdOnboarding onDone={handleHouseholdJoined} />
+        </main>
+      </div>
+    )
+  }
+
+  // ログイン済み・世帯あり → アプリ本体
   return (
     <div className="app">
       {header}

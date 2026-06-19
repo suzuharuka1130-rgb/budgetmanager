@@ -87,6 +87,37 @@ export async function getFilteredLineUserIds(
   }
 }
 
+// 全世帯のIDを返す（service role 前提）
+export async function listHouseholdIds(sb: { from: (t: string) => any }): Promise<string[]> {
+  const { data } = await sb.from('households').select('id')
+  return (data ?? []).map((h: { id: string }) => h.id)
+}
+
+// ある世帯の通知対象LINE IDを返す（line_user_id があり、通知設定が有効なメンバー）
+export async function householdLineRecipients(
+  sb: { from: (t: string) => any },
+  householdId: string,
+  preferenceKey: 'monthly_report' | 'monthly_reminder' | 'credit_input_reminder',
+): Promise<string[]> {
+  const { data: members } = await sb
+    .from('household_members')
+    .select('user_id, line_user_id')
+    .eq('household_id', householdId)
+  const withLine = (members ?? []).filter((m: { line_user_id?: string }) => !!m.line_user_id)
+  if (!withLine.length) return []
+  const { data: prefs } = await sb
+    .from('notification_preferences')
+    .select('user_id, monthly_report, monthly_reminder, credit_input_reminder')
+    .in('user_id', withLine.map((m: { user_id: string }) => m.user_id))
+  const prefMap = new Map((prefs ?? []).map((p: { user_id: string }) => [p.user_id, p]))
+  return withLine
+    .filter((m: { user_id: string }) => {
+      const p = prefMap.get(m.user_id) as Record<string, boolean> | undefined
+      return p ? p[preferenceKey] !== false : true // 設定がなければ既定ON
+    })
+    .map((m: { line_user_id: string }) => m.line_user_id)
+}
+
 /**
  * 指定メッセージを各ユーザーへ個別に push 送信する。
  * userIds を渡さない場合は環境変数（ME / WIFE）から取得する。

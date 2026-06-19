@@ -5,11 +5,13 @@ import {
   fetchNotificationPreferences, upsertNotificationPreferences, setAppSetting,
   addCard, updateCard, deactivateCard, setCardOrder,
   addOtherExpenseType, updateOtherExpenseType, deactivateOtherExpenseType, setOtherExpenseTypeOrder,
+  createInvite, createLineLinkCode, setMyLineUserId,
 } from '../lib/api'
 import Modal from '../components/Modal'
 import { BalanceForm } from '../components/EntryForms'
 import MasterManager from '../components/MasterManager'
 import { useMeta } from '../lib/meta'
+import { useHousehold } from '../lib/household'
 
 const containerVariants = {
   hidden: {},
@@ -23,12 +25,40 @@ const itemVariants = {
 export default function Settings({ onCredentialsChange }) {
   const initial = getCredentials()
   const meta = useMeta()
+  const household = useHousehold()
   const [url, setUrl] = useState(initial.url)
   const [anonKey, setAnonKey] = useState(initial.anonKey)
   const [saved, setSaved] = useState(false)
   const [showBalance, setShowBalance] = useState(false)
   const [lineSending, setLineSending] = useState(false)
   const [lineResult, setLineResult] = useState(null) // { ok, text }
+  const [userId, setUserId] = useState(null)
+
+  // メンバー管理
+  const [inviteCode, setInviteCode] = useState(null)
+  const [linkCode, setLinkCode] = useState(null)
+  const [lineInput, setLineInput] = useState('')
+  const [memberBusy, setMemberBusy] = useState(false)
+
+  const myMember = household.members.find((m) => m.user_id === userId)
+
+  async function handleInvite() {
+    setMemberBusy(true)
+    try { setInviteCode(await createInvite()) } catch { /* ignore */ } finally { setMemberBusy(false) }
+  }
+  async function handleLinkCode() {
+    setMemberBusy(true)
+    try { setLinkCode(await createLineLinkCode()) } catch { /* ignore */ } finally { setMemberBusy(false) }
+  }
+  async function handleSaveLineId() {
+    if (!userId) return
+    setMemberBusy(true)
+    try {
+      await setMyLineUserId(userId, lineInput.trim())
+      await household.refresh()
+      setLineInput('')
+    } catch { /* ignore */ } finally { setMemberBusy(false) }
+  }
 
   // アプリ名
   const [titleInput, setTitleInput] = useState(meta.appTitle)
@@ -38,7 +68,7 @@ export default function Settings({ onCredentialsChange }) {
   async function handleTitleSave(e) {
     e.preventDefault()
     try {
-      await setAppSetting('app_title', titleInput.trim() || 'Kakeibo')
+      await setAppSetting('app_title', titleInput.trim() || 'Kakeibo', household.householdId)
       await meta.refresh()
       setTitleSaved(true)
       setTimeout(() => setTitleSaved(false), 2500)
@@ -61,6 +91,7 @@ export default function Settings({ onCredentialsChange }) {
       try {
         const session = await getSession()
         if (!session?.user?.id) return
+        setUserId(session.user.id)
         const prefs = await fetchNotificationPreferences(session.user.id)
         if (prefs) {
           setNotifyPrefs({
@@ -137,30 +168,48 @@ export default function Settings({ onCredentialsChange }) {
         </form>
       </motion.div>
 
-      <motion.div variants={itemVariants}>
-        <MasterManager
-          title="カード管理"
-          addLabel="＋ カードを追加"
-          items={meta.activeCards}
-          api={{ add: addCard, update: updateCard, deactivate: deactivateCard, setOrder: setCardOrder }}
-          refresh={meta.refresh}
-          deleteWarning="既存の支出記録はこのカードを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
-          groupOptions={[
-            { value: 'housing', label: '家賃＆生活費' },
-            { value: 'leisure', label: '娯楽費' },
-          ]}
-        />
-      </motion.div>
+      <motion.div className="card" variants={itemVariants}>
+        <h3 className="section-title">メンバー管理</h3>
+        <ul className="master-list">
+          {household.members.map((m) => (
+            <li key={m.user_id} className="master-row">
+              <span className="master-name">
+                {m.email || m.user_id}
+                {m.user_id === userId && <span className="master-group">あなた</span>}
+                {m.role === 'owner' && <span className="master-group">オーナー</span>}
+              </span>
+              <span className="muted small" style={{ flexShrink: 0 }}>
+                {m.line_user_id ? 'LINE連携済み' : 'LINE未連携'}
+              </span>
+            </li>
+          ))}
+        </ul>
 
-      <motion.div variants={itemVariants}>
-        <MasterManager
-          title="その他支出タイプ管理"
-          addLabel="＋ タイプを追加"
-          items={meta.activeOtherTypes}
-          api={{ add: addOtherExpenseType, update: updateOtherExpenseType, deactivate: deactivateOtherExpenseType, setOrder: setOtherExpenseTypeOrder }}
-          refresh={meta.refresh}
-          deleteWarning="既存の記録はこのタイプを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
-        />
+        <h4 className="section-title" style={{ marginTop: '16px' }}>自分のLINE連携</h4>
+        <p className="muted small">
+          現在: {myMember?.line_user_id ? '連携済み' : '未連携'}。
+          コードを発行してLINE Botに送信すると自動で連携されます。
+        </p>
+        <button className="btn" onClick={handleLinkCode} disabled={memberBusy || !household.hasHousehold}>
+          LINE連携コードを発行
+        </button>
+        {linkCode && (
+          <p className="form-ok">
+            連携コード: <strong>{linkCode}</strong>（30分間有効）。このコードをLINE Botにそのまま送信してください。
+          </p>
+        )}
+        <div className="entry-form" style={{ marginTop: '12px' }}>
+          <label className="field">
+            <span>または LINEユーザーIDを手動入力（U…）</span>
+            <input type="text" value={lineInput} onChange={(e) => setLineInput(e.target.value)} placeholder="U06b5e2f..." />
+          </label>
+          <button className="btn" onClick={handleSaveLineId} disabled={memberBusy || !lineInput.trim()}>保存</button>
+        </div>
+
+        <h4 className="section-title" style={{ marginTop: '16px' }}>メンバーを招待</h4>
+        <p className="muted small">招待コードを発行して相手に共有してください（7日間有効）。相手はログイン後にコードを入力すると同じ家計に参加できます。</p>
+        <button className="btn" onClick={handleInvite} disabled={memberBusy || !household.hasHousehold}>招待コードを発行</button>
+        {inviteCode && <p className="form-ok">招待コード: <strong>{inviteCode}</strong></p>}
       </motion.div>
 
       <motion.div className="card" variants={itemVariants}>
@@ -210,6 +259,32 @@ export default function Settings({ onCredentialsChange }) {
         {lineResult && (
           <p className={lineResult.ok ? 'form-ok' : 'form-error'}>{lineResult.text}</p>
         )}
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <MasterManager
+          title="カード管理"
+          addLabel="＋ カードを追加"
+          items={meta.activeCards}
+          api={{ add: addCard, update: updateCard, deactivate: deactivateCard, setOrder: setCardOrder }}
+          refresh={meta.refresh}
+          deleteWarning="既存の支出記録はこのカードを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
+          groupOptions={[
+            { value: 'housing', label: '家賃＆生活費' },
+            { value: 'leisure', label: '娯楽費' },
+          ]}
+        />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <MasterManager
+          title="その他支出タイプ管理"
+          addLabel="＋ タイプを追加"
+          items={meta.activeOtherTypes}
+          api={{ add: addOtherExpenseType, update: updateOtherExpenseType, deactivate: deactivateOtherExpenseType, setOrder: setOtherExpenseTypeOrder }}
+          refresh={meta.refresh}
+          deleteWarning="既存の記録はこのタイプを参照したまま残ります（履歴は表示されます）が、新規入力では選択できなくなります。"
+        />
       </motion.div>
 
       <motion.div className="card" variants={itemVariants}>
