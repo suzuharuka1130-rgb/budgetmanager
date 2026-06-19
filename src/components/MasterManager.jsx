@@ -132,7 +132,7 @@ export default function MasterManager({ title, addLabel, items, api, refresh, de
           </label>
           {groupOptions && (
             <label className="field">
-              <span>レポートのグループ</span>
+              <span>LINEレポートカテゴリ</span>
               <select value={group} onChange={(e) => setGroup(e.target.value)}>
                 {groupOptions.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
                 <option value="__new__">＋ 新しいグループを作成…</option>
