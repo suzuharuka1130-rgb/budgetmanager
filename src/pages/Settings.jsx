@@ -10,6 +10,7 @@ import {
 import Modal from '../components/Modal'
 import { BalanceForm } from '../components/EntryForms'
 import MasterManager from '../components/MasterManager'
+import BackupRestore from '../components/BackupRestore'
 import { useMeta } from '../lib/meta'
 import { useHousehold } from '../lib/household'
 
@@ -334,6 +335,10 @@ export default function Settings({ onCredentialsChange }) {
             </form>
           </>
         )}
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <BackupRestore connected={connected} />
       </motion.div>
 
       <motion.div className="card" variants={itemVariants}>

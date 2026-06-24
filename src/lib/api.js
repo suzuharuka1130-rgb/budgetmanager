@@ -308,6 +308,25 @@ export async function setMyLineUserId(userId, lineUserId) {
   if (error) throw error
 }
 
+// ---- バックアップ ----
+// 自世帯のバックアップログを新しい順に取得（RLSで自世帯のみ）
+export async function fetchBackupLogs(limit = 5) {
+  const { data, error } = await client()
+    .from('backup_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data || []
+}
+
+// バックアップJSONから自世帯のデータを復元する（単一トランザクションのRPC）
+export async function restoreHouseholdData(backup) {
+  const { data, error } = await client().rpc('restore_household_data', { p_data: backup })
+  if (error) throw error
+  return data // { cards, monthly_income, ... } 件数
+}
+
 // ---- 通知設定 ----
 export async function fetchNotificationPreferences(userId) {
   const c = client()

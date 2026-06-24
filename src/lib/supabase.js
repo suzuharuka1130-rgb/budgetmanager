@@ -88,6 +88,18 @@ export async function sendMonthlyReport() {
   return data
 }
 
+// daily-backup Edge Function を手動起動し、Google Drive へバックアップする
+export async function runDailyBackup() {
+  const c = getClient()
+  if (!c) throw new Error('Supabase の接続情報が設定されていません。')
+  const { data, error } = await c.functions.invoke('daily-backup', { body: { manual: true } })
+  if (error) throw error
+  if (data && data.success === false) {
+    throw new Error(data.error || 'バックアップに失敗しました。')
+  }
+  return data // { success, filename, file_size }
+}
+
 // analyze-receipt Edge Function を呼び出し、画像から { amount, note } を抽出する
 export async function analyzeReceipt(base64Image, mimeType) {
   const c = getClient()
