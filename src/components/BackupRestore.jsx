@@ -151,14 +151,14 @@ export default function BackupRestore({ connected }) {
         </p>
       )}
 
-      <h4 className="section-title" style={{ marginTop: '20px' }}>バックアップ履歴</h4>
+      <h4 className="section-title" style={{ marginTop: '20px' }}>最新のバックアップ</h4>
       {logsLoading ? (
         <p className="muted small">読み込み中...</p>
       ) : logs.length === 0 ? (
         <p className="muted small">まだバックアップはありません。</p>
       ) : (
         <ul className="backup-log-list">
-          {logs.map((l) => (
+          {logs.slice(0, 1).map((l) => (
             <li key={l.id} className="backup-log-row">
               <span className="backup-log-status" aria-hidden="true">{l.status === 'success' ? '✅' : '❌'}</span>
               <span className="backup-log-date">{fmtDate(l.created_at)}</span>
