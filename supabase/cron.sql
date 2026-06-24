@@ -24,6 +24,10 @@ do $$
 begin
   perform cron.unschedule('monthly-report');
 exception when others then null; end $$;
+do $$
+begin
+  perform cron.unschedule('daily-backup');
+exception when others then null; end $$;
 
 -- 1) 毎月25日 0:00 UTC（9:00 JST）— 支出入力リマインダー
 select cron.schedule(
@@ -65,6 +69,22 @@ select cron.schedule(
   $$
   select net.http_post(
     url := 'https://<PROJECT_REF>.supabase.co/functions/v1/monthly-report',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+
+-- 4) 毎日 16:00 UTC（翌 1:00 JST）— 自動バックアップ（Google Drive へ）
+select cron.schedule(
+  'daily-backup',
+  '0 16 * * *',
+  $$
+  select net.http_post(
+    url := 'https://<PROJECT_REF>.supabase.co/functions/v1/daily-backup',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
