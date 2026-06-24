@@ -36,6 +36,44 @@ Each user can enable/disable notifications individually in **Settings → LINE�
 
 Test sends route to the requester's own LINE account based on login email.
 
+### Automated backup & restore
+Nightly backup of all data to **Google Drive**, with one-click manual backup and restore in **Settings → バックアップ・復元**.
+
+- `daily-backup` Edge Function runs via `pg_cron` every night at **1:00 JST** (`0 16 * * *` UTC)
+- Exports **all tables** to a single timestamped JSON and uploads it to a `KakeiboBackups` Drive folder
+- Keeps the **latest 30** backups; older files are deleted automatically
+- Every run is logged to the `backup_logs` table (visible per-household via RLS)
+- **今すぐバックアップ** triggers a backup on demand; **バックアップから復元** restores from an uploaded JSON
+- Restore runs as a single-transaction RPC (`restore_household_data`) — fully atomic, so a failure rolls everything back (no partial restore). It overwrites the current household's data tables only; `households` / `household_members` are left untouched
+
+Uploads use a **user OAuth refresh token** (not a service account) so files are owned by the user and use their normal Drive quota.
+
+#### Backup file structure
+
+Filename: `kakeibo-backup-YYYY-MM-DD.json`
+
+```json
+{
+  "backup_date": "2026-06-24",
+  "version": "1.0",
+  "tables": {
+    "monthly_income": [ ... ],
+    "card_expenses": [ ... ],
+    "other_expenses": [ ... ],
+    "account_balance": [ ... ],
+    "cards": [ ... ],
+    "other_expense_types": [ ... ],
+    "app_settings": [ ... ],
+    "households": [ ... ],
+    "household_members": [ ... ]
+  }
+}
+```
+
+Each key under `tables` holds the full row set for that table. On restore, only the data tables
+(`cards`, `other_expense_types`, `monthly_income`, `card_expenses`, `other_expenses`,
+`account_balance`, `app_settings`) are rewritten and reassigned to the current household.
+
 ## Tech stack
 
 | Layer | Technology |
@@ -44,6 +82,7 @@ Test sends route to the requester's own LINE account based on login email.
 | Backend | Supabase (Postgres, Auth, Storage, Edge Functions) |
 | Notifications | LINE Messaging API |
 | AI | Google Gemini 2.5 Flash (receipt analysis) |
+| Backup | Google Drive API (user OAuth) |
 | Hosting | Vercel (frontend) |
 
 ## Project structure
@@ -54,8 +93,8 @@ Test sends route to the requester's own LINE account based on login email.
 │   ├── components/     # EntryForms, Ui, Modal, MasterManager
 │   └── lib/            # api.js, supabase.js, helpers.js, meta.jsx
 ├── supabase/
-│   ├── functions/      # Edge Functions (monthly-report, reminders, analyze-receipt, etc.)
-│   ├── cron.sql        # pg_cron schedule for LINE notifications
+│   ├── functions/      # Edge Functions (monthly-report, reminders, analyze-receipt, daily-backup, etc.)
+│   ├── cron.sql        # pg_cron schedule for LINE notifications + daily backup
 │   └── config.toml
 ├── migrations/         # Incremental SQL migrations
 ├── supabase_schema.sql # Full database schema (run in SQL Editor)
@@ -109,6 +148,7 @@ npx supabase functions deploy monthly-reminder
 npx supabase functions deploy credit-input-reminder
 npx supabase functions deploy send-line-message
 npx supabase functions deploy analyze-receipt
+npx supabase functions deploy daily-backup
 ```
 
 Set secrets in Supabase (Settings → Edge Functions → Secrets):
@@ -121,10 +161,19 @@ Set secrets in Supabase (Settings → Edge Functions → Secrets):
 | `USER_EMAIL_ME` | Your login email |
 | `USER_EMAIL_WIFE` | Partner's login email |
 | `GEMINI_API_KEY` | Google Gemini API key (for receipt analysis) |
+| `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID for Drive backup |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret for Drive backup |
+| `GOOGLE_OAUTH_REFRESH_TOKEN` | OAuth refresh token (scope `drive.file`) for Drive backup |
+| `GOOGLE_DRIVE_FOLDER_ID` | *(optional)* target folder ID; auto-created if unset |
 
-### 5. LINE notification cron (optional)
+> The `daily-backup` function requires running `migrations/backup_logs.sql` first (creates the
+> `backup_logs` table and the `restore_household_data` RPC). For obtaining the Google OAuth
+> refresh token, see the setup comment at the top of `supabase/functions/daily-backup/index.ts`.
 
-Edit placeholders in `supabase/cron.sql` and run in SQL Editor to schedule automatic notifications.
+### 5. Cron jobs (optional)
+
+Edit placeholders in `supabase/cron.sql` and run in SQL Editor to schedule the LINE notifications
+and the nightly Google Drive backup (`daily-backup`, 1:00 JST).
 
 ### 6. Run locally
 
