@@ -3,18 +3,24 @@
 // 手動（設定画面の「今すぐバックアップ」）: 認証ヘッダー付きで呼び出し、呼び出しユーザーの
 //   世帯にログを記録する。
 //
-// ===== Google Drive セットアップ（サービスアカウント）=====
-// 1. Google Cloud Console → 「IAMと管理」→「サービスアカウント」→ 新規作成
-// 2. 作成したサービスアカウントの「鍵」タブ → JSON 鍵を作成・ダウンロード
-// 3. JSON 内の client_email と private_key を Supabase のシークレットに登録:
-//      supabase secrets set GOOGLE_CLIENT_EMAIL="xxxx@yyyy.iam.gserviceaccount.com"
-//      supabase secrets set GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-//    （private_key は改行を \n のまま貼り付けてOK。本コードで実改行へ復元します）
-// 4. Google Drive で「KakeiboBackups」フォルダを作成し、上記 client_email に「編集者」で共有。
-//    そのフォルダのID（URLの /folders/ 以降）を GOOGLE_DRIVE_FOLDER_ID に登録:
-//      supabase secrets set GOOGLE_DRIVE_FOLDER_ID="1AbC..."
-//    ※ GOOGLE_DRIVE_FOLDER_ID 未設定でも初回に自動作成しますが、サービスアカウント所有の
-//      フォルダは Drive UI から見えず容量制限もあるため、上記の共有フォルダ方式を推奨します。
+// ===== Google Drive セットアップ（OAuth リフレッシュトークン / 個人Gmail対応）=====
+// サービスアカウントは個人Gmailのドライブに保存できない（容量割当なし）ため、
+// ユーザー本人のOAuthでアップロードする（ファイルは本人所有・本人の容量を使用）。
+//
+// 1. Google Cloud Console → APIとサービス → OAuth同意画面 を構成
+//    - User Type: 外部 / スコープに .../auth/drive を追加 / 自分のメールを「テストユーザー」に追加
+// 2. 認証情報 → 認証情報を作成 → OAuthクライアントID → アプリの種類「ウェブアプリケーション」
+//    - 承認済みリダイレクトURI に https://developers.google.com/oauthplayground を追加
+//    - 発行された client_id と client_secret を控える
+// 3. OAuth Playground（https://developers.google.com/oauthplayground）でリフレッシュトークン取得:
+//    - 右上の歯車 → 「Use your own OAuth credentials」にチェック → client_id / client_secret を入力
+//    - 左の入力欄にスコープ https://www.googleapis.com/auth/drive を入力 → Authorize APIs → 同意
+//    - 「Exchange authorization code for tokens」→ 表示される refresh_token を控える
+// 4. Supabase シークレットに登録:
+//      supabase secrets set GOOGLE_OAUTH_CLIENT_ID="xxxx.apps.googleusercontent.com"
+//      supabase secrets set GOOGLE_OAUTH_CLIENT_SECRET="GOCSPX-..."
+//      supabase secrets set GOOGLE_OAUTH_REFRESH_TOKEN="1//0g..."
+//    - GOOGLE_DRIVE_FOLDER_ID は任意（未設定なら本人ドライブに KakeiboBackups を自動作成）。
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 
@@ -49,59 +55,23 @@ function backupDateJST(): string {
   return `${y}-${m}-${d}`
 }
 
-// ---- Google サービスアカウント認証（RS256 JWT → アクセストークン）----
-function base64url(input: ArrayBuffer | string): string {
-  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input)
-  let bin = ''
-  for (const b of bytes) bin += String.fromCharCode(b)
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function pemToDer(pem: string): ArrayBuffer {
-  const body = pem
-    .replace(/\\n/g, '\n')
-    .replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\s+/g, '')
-  const bin = atob(body)
-  const buf = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i)
-  return buf.buffer
-}
-
+// ---- Google OAuth 認証（リフレッシュトークン → アクセストークン）----
 async function getAccessToken(): Promise<string> {
-  const clientEmail = Deno.env.get('GOOGLE_CLIENT_EMAIL')?.trim()
-  const privateKey = Deno.env.get('GOOGLE_PRIVATE_KEY')
-  if (!clientEmail || !privateKey) {
-    throw new Error('GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY が未設定です。')
+  const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')?.trim()
+  const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')?.trim()
+  const refreshToken = Deno.env.get('GOOGLE_OAUTH_REFRESH_TOKEN')?.trim()
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REFRESH_TOKEN が未設定です。')
   }
-  const now = Math.floor(Date.now() / 1000)
-  const header = { alg: 'RS256', typ: 'JWT' }
-  const claim = {
-    iss: clientEmail,
-    scope: 'https://www.googleapis.com/auth/drive',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  }
-  const unsigned = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(claim))}`
-
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    pemToDer(privateKey),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned))
-  const jwt = `${unsigned}.${base64url(sig)}`
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
     }),
   })
   const data = await res.json()
@@ -110,8 +80,6 @@ async function getAccessToken(): Promise<string> {
   }
   return data.access_token as string
 }
-
-const DRIVE_Q = 'supportsAllDrives=true&includeItemsFromAllDrives=true'
 
 // KakeiboBackups フォルダID を取得（未設定なら検索、無ければ作成）
 async function resolveFolderId(token: string): Promise<string> {
@@ -122,13 +90,13 @@ async function resolveFolderId(token: string): Promise<string> {
     `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
   )
   const listRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&${DRIVE_Q}`,
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`,
     { headers: { Authorization: `Bearer ${token}` } },
   )
   const listData = await listRes.json()
   if (listData.files?.length) return listData.files[0].id
 
-  const createRes = await fetch(`https://www.googleapis.com/drive/v3/files?${DRIVE_Q}`, {
+  const createRes = await fetch(`https://www.googleapis.com/drive/v3/files`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }),
@@ -142,7 +110,7 @@ async function resolveFolderId(token: string): Promise<string> {
 
 // JSON文字列をフォルダにアップロード（multipart）
 async function uploadJson(token: string, folderId: string, filename: string, content: string): Promise<void> {
-  const boundary = '-------kakeibo' + base64url(crypto.getRandomValues(new Uint8Array(12)).buffer)
+  const boundary = '-------kakeibo' + crypto.randomUUID().replace(/-/g, '')
   const metadata = { name: filename, parents: [folderId] }
   const body =
     `--${boundary}\r\n` +
@@ -154,7 +122,7 @@ async function uploadJson(token: string, folderId: string, filename: string, con
     `--${boundary}--`
 
   const res = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true`,
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`,
     {
       method: 'POST',
       headers: {
@@ -175,14 +143,14 @@ async function pruneOldBackups(token: string, folderId: string): Promise<void> {
     `'${folderId}' in parents and name contains '${FILE_PREFIX}' and trashed=false`,
   )
   const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&fields=files(id,name,createdTime)&pageSize=1000&${DRIVE_Q}`,
+    `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&fields=files(id,name,createdTime)&pageSize=1000`,
     { headers: { Authorization: `Bearer ${token}` } },
   )
   const data = await res.json()
   const files: { id: string }[] = data.files ?? []
   const toDelete = files.slice(KEEP_FILES)
   for (const f of toDelete) {
-    await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?supportsAllDrives=true`, {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     })
