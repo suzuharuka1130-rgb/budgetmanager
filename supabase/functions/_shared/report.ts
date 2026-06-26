@@ -24,6 +24,21 @@ export function getServiceClient(): SupabaseClient {
   return createClient(url, key)
 }
 
+// 世帯の app_settings から値を取得（無ければ null）
+export async function getHouseholdSetting(
+  sb: SupabaseClient,
+  hid: string,
+  key: string,
+): Promise<string | null> {
+  const { data } = await sb
+    .from('app_settings')
+    .select('value')
+    .eq('household_id', hid)
+    .eq('key', key)
+    .maybeSingle()
+  return data?.value ?? null
+}
+
 async function monthSum(
   sb: SupabaseClient,
   table: string,
