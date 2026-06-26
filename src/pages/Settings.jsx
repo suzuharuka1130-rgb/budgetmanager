@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { getCredentials, saveCredentials, signOut, hasEnvCredentials, sendMonthlyReport, getSession } from '../lib/supabase'
 import {
-  fetchNotificationPreferences, upsertNotificationPreferences, setAppSetting,
+  fetchNotificationPreferences, upsertNotificationPreferences, setAppSetting, fetchAppSettings,
   addCard, updateCard, deactivateCard, setCardOrder,
   addOtherExpenseType, updateOtherExpenseType, deactivateOtherExpenseType, setOtherExpenseTypeOrder,
   createInvite, createLineLinkCode, setMyLineUserId,
@@ -93,6 +93,40 @@ export default function Settings({ onCredentialsChange }) {
   })
   const [notifyLoading, setNotifyLoading] = useState(true)
   const [notifySaving, setNotifySaving] = useState(false)
+
+  // リマインダー文面（世帯ごと・app_settings に保存）
+  const [reminderMonthly, setReminderMonthly] = useState('')
+  const [reminderCredit, setReminderCredit] = useState('')
+  const [templatesSaving, setTemplatesSaving] = useState(false)
+  const [templatesSaved, setTemplatesSaved] = useState(false)
+
+  useEffect(() => {
+    async function loadTemplates() {
+      try {
+        const s = await fetchAppSettings()
+        setReminderMonthly(s.reminder_monthly_text || '')
+        setReminderCredit(s.reminder_credit_text || '')
+      } catch {
+        // 未接続時などは空のまま
+      }
+    }
+    loadTemplates()
+  }, [])
+
+  async function handleSaveTemplates(e) {
+    e.preventDefault()
+    setTemplatesSaving(true)
+    try {
+      await setAppSetting('reminder_monthly_text', reminderMonthly, household.householdId)
+      await setAppSetting('reminder_credit_text', reminderCredit, household.householdId)
+      setTemplatesSaved(true)
+      setTimeout(() => setTemplatesSaved(false), 2500)
+    } catch {
+      // ignore
+    } finally {
+      setTemplatesSaving(false)
+    }
+  }
 
   useEffect(() => {
     async function loadPrefs() {
@@ -256,6 +290,35 @@ export default function Settings({ onCredentialsChange }) {
             </label>
           </div>
         )}
+
+        <h4 className="section-title" style={{ marginTop: '20px' }}>リマインダー文面のカスタマイズ</h4>
+        <p className="muted small">
+          支出入力・クレジット入力リマインダーで送信される文面です。空欄の場合は送信されません。
+        </p>
+        <form className="entry-form" onSubmit={handleSaveTemplates}>
+          <label className="field">
+            <span>支出入力リマインダー（毎月25日）</span>
+            <textarea
+              value={reminderMonthly}
+              onChange={(e) => setReminderMonthly(e.target.value)}
+              rows={5}
+              placeholder="例: 今月の支出をアプリに入力しましょう！"
+            />
+          </label>
+          <label className="field">
+            <span>クレジット入力リマインダー（月末）</span>
+            <textarea
+              value={reminderCredit}
+              onChange={(e) => setReminderCredit(e.target.value)}
+              rows={4}
+              placeholder="例: 今月使用したクレジット金額を入力してください。"
+            />
+          </label>
+          <button type="submit" className="btn primary" disabled={!connected || templatesSaving}>
+            {templatesSaving ? '保存中...' : '文面を保存'}
+          </button>
+          {templatesSaved && <p className="form-ok">保存しました。</p>}
+        </form>
 
         <h4 className="section-title" style={{ marginTop: '20px' }}>LINE通知テスト送信</h4>
         <p className="muted small">

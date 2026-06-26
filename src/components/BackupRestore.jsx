@@ -94,7 +94,7 @@ export default function BackupRestore({ connected }) {
       try {
         const obj = JSON.parse(String(reader.result))
         if (!obj || typeof obj !== 'object' || !obj.tables) {
-          throw new Error('バックアップ形式が不正です（tables が見つかりません）。')
+          throw new Error('バックアップ形式が不正です（データテーブルが見つかりません）。')
         }
         setParsed(obj)
       } catch (err) {

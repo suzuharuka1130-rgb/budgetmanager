@@ -188,7 +188,7 @@ body {
 
 /* セレクタ */
 .selector-row { display: flex; gap: 8px; margin-bottom: 8px; }
-select, input[type="month"], input[type="number"], input[type="text"], input[type="url"] {
+select, textarea, input[type="month"], input[type="number"], input[type="text"], input[type="url"] {
   font-size: 15px;
   padding: 9px 10px;
   border: 1px solid var(--border);
@@ -209,7 +209,8 @@ input[type="month"] {
   text-align: left;
 }
 input[type="month"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
-select:focus, input:focus { outline: none; border-color: var(--primary); }
+select:focus, input:focus, textarea:focus { outline: none; border-color: var(--primary); }
+textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height: 84px; }
 .selector-row select { width: auto; }
 
 /* チャートカード */
