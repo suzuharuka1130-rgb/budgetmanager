@@ -125,8 +125,8 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
                   type="button"
                   className="entry-receipt-btn"
                   onClick={() => openReceipt(r.receiptPath)}
-                  aria-label="レシート画像を表示"
-                  title="レシート画像"
+                  aria-label="明細画像を表示"
+                  title="明細画像"
                 >
                   <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -187,10 +187,10 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
         )}
       </Modal>
 
-      <Modal open={!!receipt} title="レシート画像" onClose={() => setReceipt(null)}>
+      <Modal open={!!receipt} title="明細画像" onClose={() => setReceipt(null)}>
         {receipt?.loading && <p className="muted">読み込み中...</p>}
         {receipt?.error && <p className="form-error">画像の取得に失敗しました: {receipt.error}</p>}
-        {receipt?.url && <img className="receipt-full" src={receipt.url} alt="レシート" />}
+        {receipt?.url && <img className="receipt-full" src={receipt.url} alt="明細" />}
       </Modal>
     </>
   )
