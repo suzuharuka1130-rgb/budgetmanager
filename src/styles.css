@@ -382,15 +382,30 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
   border: 1px solid var(--border); border-radius: 8px; flex-shrink: 0;
 }
 .receipt-full { width: 100%; height: auto; border-radius: 8px; display: block; }
-.entry-receipt-btn {
-  flex-shrink: 0;
-  background: none; border: none; color: var(--muted);
-  cursor: pointer; padding: 8px; margin: -4px 0; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+
+/* クリックで取引明細モーダルを開けるカード明細行 */
+.entry-item--clickable { cursor: pointer; }
+.entry-item--clickable:hover { background: var(--hover); }
+
+/* 取引明細の編集テーブル（カード支出フォーム内） */
+.txn-editor { display: flex; flex-direction: column; gap: 6px; }
+.txn-row { display: grid; grid-template-columns: 1fr 96px 140px auto; gap: 6px; align-items: center; }
+.txn-row input { width: 100%; }
+.btn-link {
+  align-self: flex-start; background: none; border: none; padding: 0;
+  color: var(--primary); font-size: 12px; cursor: pointer;
 }
-.entry-receipt-btn:hover { background: var(--block); color: var(--primary); }
-.entry-receipt-btn svg { pointer-events: none; }
+
+/* 取引明細の閲覧テーブル（詳細モーダル） */
+.txn-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.txn-table th, .txn-table td {
+  padding: 8px 6px; border-bottom: 1px solid var(--border);
+  text-align: left; vertical-align: top;
+}
+.txn-table th { color: var(--muted); font-weight: 600; }
+.txn-table .txn-amount-col { text-align: right; white-space: nowrap; }
+.txn-table tfoot td { font-weight: 700; border-bottom: none; }
+.txn-receipt { margin-top: 16px; }
 
 /* カード（設定など） */
 .card {

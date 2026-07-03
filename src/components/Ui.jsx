@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { formatYen, monthLabel } from '../lib/helpers'
 import {
   deleteIncome, deleteCardExpense, deleteOtherExpense,
   confirmIncome, confirmCardExpense, confirmOtherExpense,
-  getReceiptSignedUrl,
+  getReceiptSignedUrl, fetchCardExpenseTransactions,
 } from '../lib/api'
 import { useMeta } from '../lib/meta'
 import Modal from './Modal'
@@ -36,24 +36,14 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
   const [confirmRow, setConfirmRow] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
   const [confirmingId, setConfirmingId] = useState(null)
-  const [receipt, setReceipt] = useState(null) // { url, loading, error }
+  const [details, setDetails] = useState(null) // { cardExpenseId, receiptPath, label, amount }
 
   const pending = (r) => r.confirmed === false
   const rows = [
     ...income.map((r) => ({ id: 'i' + r.id, dbId: r.id, table: 'income', kind: '入金', label: '入金', amount: r.amount, note: r.note, color: '#0ea5e9', sign: '+', pending: pending(r) })),
-    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: cardName(r.card_id), amount: r.amount, note: r.note, color: cardColor(r.card_id), sign: '-', pending: pending(r), receiptPath: r.receipt_image_url })),
+    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: cardName(r.card_id), amount: r.amount, note: r.note, color: cardColor(r.card_id), sign: '-', pending: pending(r), receiptPath: r.receipt_image_url, cardExpenseId: r.id, detailable: !!r.has_transactions || !!r.receipt_image_url })),
     ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: typeName(r.expense_type_id), amount: r.amount, note: r.note, color: typeColor(r.expense_type_id), sign: '-', pending: pending(r) })),
   ]
-
-  async function openReceipt(path) {
-    setReceipt({ url: null, loading: true, error: null })
-    try {
-      const url = await getReceiptSignedUrl(path, 120)
-      setReceipt({ url, loading: false, error: null })
-    } catch (err) {
-      setReceipt({ url: null, loading: false, error: err.message || String(err) })
-    }
-  }
 
   async function performConfirm(r) {
     setConfirmingId(r.id)
@@ -99,15 +89,22 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
     <>
       <ul className="entry-list">
         <AnimatePresence initial={false}>
-          {rows.map((r, i) => (
+          {rows.map((r, i) => {
+            const clickable = r.table === 'cards' && r.detailable
+            const openDetails = () => setDetails({ cardExpenseId: r.cardExpenseId, receiptPath: r.receiptPath, label: r.label, amount: r.amount })
+            return (
             <motion.li
               key={r.id}
-              className={'entry-item' + (r.pending ? ' pending' : '')}
+              className={'entry-item' + (r.pending ? ' pending' : '') + (clickable ? ' entry-item--clickable' : '')}
               layout
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, height: 0, marginTop: 0, paddingTop: 0, paddingBottom: 0 }}
               transition={{ duration: 0.2, delay: Math.min(i * 0.025, 0.2) }}
+              onClick={clickable ? openDetails : undefined}
+              role={clickable ? 'button' : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetails() } } : undefined}
             >
               <span className="dot" style={{ background: r.color }} />
               <div className="entry-main">
@@ -120,26 +117,11 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
               <span className="entry-amount" style={{ color: r.pending ? '#9b9a97' : (r.sign === '+' ? '#0ea5e9' : '#111') }}>
                 {r.sign}{formatYen(r.amount)}
               </span>
-              {r.receiptPath && (
-                <button
-                  type="button"
-                  className="entry-receipt-btn"
-                  onClick={() => openReceipt(r.receiptPath)}
-                  aria-label="明細画像を表示"
-                  title="明細画像"
-                >
-                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <path d="M21 15l-5-5L5 21" />
-                  </svg>
-                </button>
-              )}
               {onRefresh && r.pending && (
                 <button
                   type="button"
                   className="entry-confirm-btn"
-                  onClick={() => performConfirm(r)}
+                  onClick={(e) => { e.stopPropagation(); performConfirm(r) }}
                   disabled={confirmingId === r.id}
                   title="確定して口座残高に反映"
                 >
@@ -150,7 +132,7 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
                 <button
                   type="button"
                   className="entry-delete-btn"
-                  onClick={() => { setDeleteError(null); setConfirmRow(r) }}
+                  onClick={(e) => { e.stopPropagation(); setDeleteError(null); setConfirmRow(r) }}
                   aria-label="削除"
                   title="削除"
                 >
@@ -163,7 +145,8 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
                 </button>
               )}
             </motion.li>
-          ))}
+            )
+          })}
         </AnimatePresence>
       </ul>
 
@@ -187,12 +170,91 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
         )}
       </Modal>
 
-      <Modal open={!!receipt} title="明細画像" onClose={() => setReceipt(null)}>
-        {receipt?.loading && <p className="muted">読み込み中...</p>}
-        {receipt?.error && <p className="form-error">画像の取得に失敗しました: {receipt.error}</p>}
-        {receipt?.url && <img className="receipt-full" src={receipt.url} alt="明細" />}
-      </Modal>
+      <TransactionDetailsModal
+        open={!!details}
+        onClose={() => setDetails(null)}
+        cardExpenseId={details?.cardExpenseId}
+        receiptPath={details?.receiptPath}
+        label={details?.label}
+        amount={details?.amount}
+      />
     </>
+  )
+}
+
+// 'YYYY-MM-DD' を 'MM/DD' 表示に変換する
+function formatTxnDate(isoDate) {
+  if (!isoDate) return ''
+  const [, m, d] = isoDate.split('-')
+  return m && d ? `${m}/${d}` : isoDate
+}
+
+// カード明細の取引一覧＋スクリーンショットを表示する（閲覧専用）モーダル
+function TransactionDetailsModal({ open, onClose, cardExpenseId, receiptPath, label, amount }) {
+  const [txns, setTxns] = useState(null) // null=未取得, []=空
+  const [loadError, setLoadError] = useState(null)
+  const [receipt, setReceipt] = useState(null) // { url, loading, error }
+
+  useEffect(() => {
+    if (!open || cardExpenseId == null) return
+    let alive = true
+    setTxns(null)
+    setLoadError(null)
+    setReceipt(null)
+    fetchCardExpenseTransactions(cardExpenseId)
+      .then((data) => { if (alive) setTxns(data) })
+      .catch((err) => { if (alive) setLoadError(err.message || String(err)) })
+    return () => { alive = false }
+  }, [open, cardExpenseId])
+
+  async function openReceipt() {
+    setReceipt({ url: null, loading: true, error: null })
+    try {
+      const url = await getReceiptSignedUrl(receiptPath, 120)
+      setReceipt({ url, loading: false, error: null })
+    } catch (err) {
+      setReceipt({ url: null, loading: false, error: err.message || String(err) })
+    }
+  }
+
+  const total = (txns || []).reduce((s, t) => s + Number(t.amount || 0), 0)
+
+  return (
+    <Modal open={open} title={label || '取引明細'} onClose={onClose}>
+      {loadError && <p className="form-error">取引明細の取得に失敗しました: {loadError}</p>}
+      {!loadError && txns === null && <p className="muted">読み込み中...</p>}
+      {!loadError && txns && txns.length === 0 && <p className="muted">明細記録はありません。</p>}
+      {!loadError && txns && txns.length > 0 && (
+        <table className="txn-table">
+          <thead>
+            <tr><th>内容</th><th>日付</th><th className="txn-amount-col">金額</th></tr>
+          </thead>
+          <tbody>
+            {txns.map((t) => (
+              <tr key={t.id}>
+                <td>{t.name || '—'}</td>
+                <td className="muted">{formatTxnDate(t.txn_date) || '—'}</td>
+                <td className="txn-amount-col">{formatYen(t.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr><td>合計</td><td></td><td className="txn-amount-col">{formatYen(total)}</td></tr>
+          </tfoot>
+        </table>
+      )}
+
+      {receiptPath && (
+        <div className="txn-receipt">
+          {!receipt && (
+            <button type="button" className="btn" onClick={openReceipt}>スクリーンショットを表示</button>
+          )}
+          {receipt?.loading && <p className="muted">読み込み中...</p>}
+          {receipt?.error && <p className="form-error">画像の取得に失敗しました: {receipt.error}</p>}
+          {receipt?.url && <img className="receipt-full" src={receipt.url} alt="明細画像" />}
+        </div>
+      )}
+    </Modal>
   )
 }
 

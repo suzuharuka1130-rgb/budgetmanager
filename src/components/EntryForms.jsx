@@ -1,8 +1,22 @@
 import { useState, useEffect } from 'react'
 import { currentYearMonth, toMonthValue, fromMonthValue } from '../lib/helpers'
-import { addIncome, addCardExpense, addOtherExpense, setAccountBalance, uploadReceipt } from '../lib/api'
+import { addIncome, addCardExpense, addCardExpenseTransactions, addOtherExpense, setAccountBalance, uploadReceipt } from '../lib/api'
 import { analyzeReceipt } from '../lib/supabase'
 import { useMeta } from '../lib/meta'
+import { TrashIcon } from './icons'
+
+// 個別取引リストの合計金額（円）
+function sumTxns(list) {
+  return (list || []).reduce((s, t) => s + (Number(t.amount) || 0), 0)
+}
+
+// OCRが読み取った「日にち」と対象月（年・月）を組み合わせてYYYY-MM-DDを作る。
+// 年・月はスクリーンショットに写っていなくても対象月から補える。
+function buildDateFromDay(monthVal, day) {
+  if (!day) return ''
+  const { year, month } = fromMonthValue(monthVal)
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
 
 // 画像を縮小して JPEG base64（プレフィックス除去）に変換する。
 // スマホ写真は数MBあり、そのまま送ると Edge Function / Gemini で失敗しやすいため、
@@ -138,11 +152,45 @@ export function CardExpenseForm({ onSaved }) {
   const [analyzing, setAnalyzing] = useState(false)
   const [aiFilled, setAiFilled] = useState(false)
   const [warning, setWarning] = useState(null)
+  const [txns, setTxns] = useState([]) // [{ name, amount(string), date }]
+  const [amountManual, setAmountManual] = useState(false) // 金額を手入力したら true（自動合計を止める）
 
   // カード一覧読み込み後、未選択なら先頭を選択
   useEffect(() => {
     if (!cardId && activeCards.length) setCardId(activeCards[0].id)
   }, [activeCards, cardId])
+
+  // 金額フィールドの手入力（AmountField.onChange はユーザー操作でのみ発火）
+  function handleAmountInput(v) {
+    setAmountManual(true)
+    setAmount(v)
+  }
+
+  // 取引リスト変更時、手入力でなければ金額を合計に同期する
+  function applyTxns(next) {
+    setTxns(next)
+    if (!amountManual) setAmount(sumTxns(next) ? String(sumTxns(next)) : '')
+  }
+  function updateTxn(i, patch) {
+    applyTxns(txns.map((t, idx) => (idx === i ? { ...t, ...patch } : t)))
+  }
+  function addTxn() {
+    setTxns((prev) => [...prev, { name: '', amount: '', date: '' }])
+  }
+  function removeTxn(i) {
+    applyTxns(txns.filter((_, idx) => idx !== i))
+  }
+  function resetAmountToSum() {
+    setAmountManual(false)
+    setAmount(sumTxns(txns) ? String(sumTxns(txns)) : '')
+  }
+
+  // 対象月を変更したら、既存の取引日の「日にち」部分は保ったまま年・月だけ差し替える
+  useEffect(() => {
+    const { year, month } = fromMonthValue(monthVal)
+    const ym = `${year}-${String(month).padStart(2, '0')}`
+    setTxns((prev) => prev.map((t) => (t.date ? { ...t, date: `${ym}-${t.date.slice(-2)}` } : t)))
+  }, [monthVal])
 
   function handleFileChange(e) {
     setError(null)
@@ -160,6 +208,8 @@ export function CardExpenseForm({ onSaved }) {
     setFile(f)
     setPreviewUrl(URL.createObjectURL(f))
     setAiFilled(false)
+    setTxns([])
+    setAmountManual(false)
   }
 
   async function handleAnalyze() {
@@ -168,9 +218,17 @@ export function CardExpenseForm({ onSaved }) {
     setError(null)
     try {
       const base64 = await downscaleImageToBase64(file)
-      const { amount: aiAmount, note: aiNote } = await analyzeReceipt(base64, 'image/jpeg')
-      setAmount(aiAmount ? String(Math.round(aiAmount)) : '')
-      setNote(aiNote || '')
+      const res = await analyzeReceipt(base64, 'image/jpeg')
+      const list = (res.transactions || []).map((t) => ({
+        name: t.name || '',
+        amount: t.amount != null ? String(Math.round(Number(t.amount) || 0)) : '',
+        date: buildDateFromDay(monthVal, t.day),
+      }))
+      setTxns(list)
+      setNote(res.note || '')
+      setAmountManual(false)
+      const total = list.length ? sumTxns(list) : (res.total ?? res.amount ?? 0)
+      setAmount(total ? String(Math.round(total)) : '')
       setAiFilled(true)
     } catch {
       setError('AI読み取りに失敗しました。手動で入力してください。')
@@ -197,10 +255,17 @@ export function CardExpenseForm({ onSaved }) {
           setWarning('画像のアップロードに失敗しました。明細のみ保存します。')
         }
       }
-      await addCardExpense({
+      const cardExpenseId = await addCardExpense({
         year, month, card_id: cardId, amount: Number(amount),
         note: note || null, receipt_image_url: receiptPath,
       })
+      if (txns.length) {
+        try {
+          await addCardExpenseTransactions(cardExpenseId, txns)
+        } catch {
+          setWarning('取引明細の保存に一部失敗しました。合計は保存されました。')
+        }
+      }
       onSaved()
     } catch (e2) {
       setError(e2.message || '保存に失敗しました。')
@@ -244,7 +309,48 @@ export function CardExpenseForm({ onSaved }) {
       </div>
 
       {aiFilled && <p className="ai-fill-label">AIが読み取った内容（確認・編集してください）</p>}
-      <AmountField value={amount} onChange={setAmount} />
+      <AmountField value={amount} onChange={handleAmountInput} />
+      {amountManual && txns.length > 0 && (
+        <button type="button" className="btn-link" onClick={resetAmountToSum}>取引の合計に戻す</button>
+      )}
+
+      {(aiFilled || txns.length > 0) && (
+        <div className="field">
+          <span>取引明細（編集可）</span>
+          <div className="txn-editor">
+            {txns.map((t, i) => (
+              <div key={i} className="txn-row">
+                <input
+                  type="text"
+                  className="txn-name"
+                  value={t.name}
+                  onChange={(e) => updateTxn(i, { name: e.target.value })}
+                  placeholder="利用先"
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="txn-amount"
+                  value={t.amount === '' ? '' : Number(t.amount).toLocaleString('ja-JP')}
+                  onChange={(e) => updateTxn(i, { amount: e.target.value.replace(/[^\d]/g, '') })}
+                  placeholder="金額"
+                />
+                <input
+                  type="date"
+                  className="txn-date"
+                  value={t.date}
+                  onChange={(e) => updateTxn(i, { date: e.target.value })}
+                />
+                <button type="button" className="icon-btn sm" onClick={() => removeTxn(i)} title="削除">
+                  <TrashIcon />
+                </button>
+              </div>
+            ))}
+            <button type="button" className="btn" onClick={addTxn}>＋ 取引を追加</button>
+          </div>
+        </div>
+      )}
+
       <NoteField value={note} onChange={setNote} />
       {warning && <p className="form-warning">{warning}</p>}
     </FormShell>

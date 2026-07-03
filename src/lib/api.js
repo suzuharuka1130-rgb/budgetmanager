@@ -22,9 +22,21 @@ export async function fetchMonth(year, month) {
 
   const balance = await computeBalanceAt(c, year, month, allBalances.data || [])
 
+  // 各カード明細に個別取引があるか（行クリックの判定用）。単一列の軽量クエリ。
+  const cardRows = cards.data || []
+  let txnIds = new Set()
+  if (cardRows.length) {
+    const { data: txns, error: txErr } = await c
+      .from('card_expense_transactions')
+      .select('card_expense_id')
+      .in('card_expense_id', cardRows.map((r) => r.id))
+    if (txErr) throw txErr
+    txnIds = new Set((txns || []).map((t) => t.card_expense_id))
+  }
+
   return {
     income: income.data || [],
-    cards: cards.data || [],
+    cards: cardRows.map((r) => ({ ...r, has_transactions: txnIds.has(r.id) })),
     others: others.data || [],
     balance,
   }
@@ -130,10 +142,41 @@ export async function addIncome({ year, month, amount, note }) {
 
 export async function addCardExpense({ year, month, card_id, amount, note, receipt_image_url = null }) {
   const confirmed = !isFutureMonth(year, month)
-  const { error } = await client()
+  const { data, error } = await client()
     .from('card_expenses')
     .insert({ year, month, card_id, amount, note, confirmed, receipt_image_url })
+    .select('id')
+    .single()
   if (error) throw error
+  return data.id
+}
+
+// カード明細の個別取引を一括挿入する（household_id はトリガーで自動補完）。
+// 空行（名前・金額・日付いずれも無い）は除外する。
+export async function addCardExpenseTransactions(cardExpenseId, transactions) {
+  const rows = (transactions || [])
+    .map((t, i) => ({
+      card_expense_id: cardExpenseId,
+      name: (t.name || '').trim(),
+      amount: Number(t.amount) || 0,
+      txn_date: t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : null,
+      display_order: i,
+    }))
+    .filter((r) => r.name !== '' || r.amount > 0 || r.txn_date !== null)
+  if (rows.length === 0) return
+  const { error } = await client().from('card_expense_transactions').insert(rows)
+  if (error) throw error
+}
+
+// 指定カード明細の個別取引を取得する（詳細モーダルを開いたとき遅延取得）。
+export async function fetchCardExpenseTransactions(cardExpenseId) {
+  const { data, error } = await client()
+    .from('card_expense_transactions')
+    .select('id, name, amount, txn_date, display_order')
+    .eq('card_expense_id', cardExpenseId)
+    .order('display_order')
+  if (error) throw error
+  return data || []
 }
 
 // ---- レシート画像（Supabase Storage: receipts バケット）----
