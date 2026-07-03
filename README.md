@@ -14,7 +14,11 @@ Built for two users to manage shared finances from mobile or desktop.
 
 ### Expense tracking
 - Dynamic **card** and **other expense type** masters (manageable in Settings)
-- Receipt/statement image upload with **Gemini Vision** auto-extraction of amount and note
+- Card statement screenshot upload with **Gemini Vision** auto-extraction — reads each individual
+  transaction (name, amount, date) plus the total, all editable before saving; 金額 auto-sums the
+  extracted transactions but can be overridden manually
+- Click a card expense row in the 明細 list to view its saved transactions (and the original
+  screenshot) in a read-only detail modal
 - Future-month entries stay **pending** until confirmed (won't affect balance until confirmed)
 - Delete entries from the detail list (hover on desktop, tap on mobile)
 
@@ -29,10 +33,15 @@ Scheduled via Supabase `pg_cron` + Edge Functions:
 | Notification | Schedule | Description |
 |---|---|---|
 | 月次レポート | 1st of month, 9:00 JST | Previous month's summary + current month's scheduled debits |
-| 支出入力リマインダー | 25th of month, 9:00 JST | Reminder to log expenses |
-| クレジット入力リマインダー | Last day of month, 9:00 JST | Reminder to enter credit card amounts |
+| Custom notifications | Daily check, 9:00 JST | User-defined reminders with custom text and send day (see below) |
 
-Each user can enable/disable notifications individually in **Settings → LINE通知**.
+Each user can enable/disable 月次レポート individually in **Settings → LINE通知**.
+
+**Custom notifications** (通知管理, also under Settings → LINE通知) replace the old fixed-date
+reminders — households can create any number of notifications with their own message and a
+monthly send day (1–31 or 月末), edit or delete them at any time, and each member can opt in/out
+of each notification individually. A single `custom-reminder` function runs daily and sends only
+the notifications whose configured day matches today (JST).
 
 Test sends route to the requester's own LINE account based on login email.
 
@@ -74,6 +83,11 @@ Each key under `tables` holds the full row set for that table. On restore, only 
 (`cards`, `other_expense_types`, `monthly_income`, `card_expenses`, `other_expenses`,
 `account_balance`, `app_settings`) are rewritten and reassigned to the current household.
 
+> **Known limitation:** `card_expense_transactions` (per-transaction OCR detail) and the custom
+> notification tables (`custom_notifications`, `custom_notification_prefs`) are not yet included
+> in backup/restore. Restoring regenerates `card_expenses` row IDs, so transaction detail rows
+> (keyed by the old ID) would be orphaned — this needs an ID-remap step before it can be added safely.
+
 ## Tech stack
 
 | Layer | Technology |
@@ -93,7 +107,7 @@ Each key under `tables` holds the full row set for that table. On restore, only 
 │   ├── components/     # EntryForms, Ui, Modal, MasterManager
 │   └── lib/            # api.js, supabase.js, helpers.js, meta.jsx
 ├── supabase/
-│   ├── functions/      # Edge Functions (monthly-report, reminders, analyze-receipt, daily-backup, etc.)
+│   ├── functions/      # Edge Functions (monthly-report, custom-reminder, analyze-receipt, daily-backup, etc.)
 │   ├── cron.sql        # pg_cron schedule for LINE notifications + daily backup
 │   └── config.toml
 ├── migrations/         # Incremental SQL migrations

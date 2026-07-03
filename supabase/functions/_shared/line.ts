@@ -141,12 +141,9 @@ export async function customNotificationRecipients(
     .map((m: { line_user_id: string }) => m.line_user_id)
 }
 
-/**
- * 指定メッセージを各ユーザーへ個別に push 送信する。
- * userIds を渡さない場合は環境変数（ME / WIFE）から取得する。
- */
-export async function sendLineMessage(
-  message: string,
+// LINE Messaging API へ 1 メッセージオブジェクトを各ユーザーへ個別 push する共通処理
+async function pushMessage(
+  message: Record<string, unknown>,
   userIds?: string[],
 ): Promise<SendResult[]> {
   const token = Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN')
@@ -166,10 +163,7 @@ export async function sendLineMessage(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          to: userId,
-          messages: [{ type: 'text', text: message }],
-        }),
+        body: JSON.stringify({ to: userId, messages: [message] }),
       })
       results.push({
         userId,
@@ -182,4 +176,63 @@ export async function sendLineMessage(
     }
   }
   return results
+}
+
+/**
+ * 指定メッセージを各ユーザーへ個別に push 送信する。
+ * userIds を渡さない場合は環境変数（ME / WIFE）から取得する。
+ */
+export async function sendLineMessage(
+  message: string,
+  userIds?: string[],
+): Promise<SendResult[]> {
+  return pushMessage({ type: 'text', text: message }, userIds)
+}
+
+/**
+ * Flex Message を各ユーザーへ個別に push 送信する。
+ * userIds を渡さない場合は環境変数（ME / WIFE）から取得する。
+ */
+export async function sendLineFlexMessage(
+  altText: string,
+  contents: Record<string, unknown>,
+  userIds?: string[],
+): Promise<SendResult[]> {
+  return pushMessage({ type: 'flex', altText, contents }, userIds)
+}
+
+/**
+ * 複数行のレポート本文 + アプリを開くボタンを持つ Flex Message（bubble）を組み立てる。
+ * Flex の text コンポーネントは改行を解釈しないため、行ごとに分割してスタックする。
+ * 空行は高さを保つためゼロ幅スペースに置き換える。
+ */
+export function buildAppLinkFlexContents(bodyText: string, appUrl: string): Record<string, unknown> {
+  const lines = bodyText.split('\n')
+  return {
+    type: 'bubble',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'xs',
+      contents: lines.map((line) => ({
+        type: 'text',
+        text: line === '' ? '​' : line,
+        size: 'sm',
+        wrap: true,
+      })),
+    },
+    footer: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'sm',
+      contents: [
+        {
+          type: 'button',
+          style: 'primary',
+          color: '#166534',
+          action: { type: 'uri', label: 'Kakeiboを開く', uri: appUrl },
+        },
+      ],
+    },
+  }
 }
