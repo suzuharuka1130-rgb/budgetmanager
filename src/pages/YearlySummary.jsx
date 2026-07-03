@@ -105,7 +105,7 @@ export default function YearlySummary() {
               <ResponsiveContainer width="100%" height={340}>
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" fontSize={12} />
+                  <XAxis dataKey="name" fontSize={12} interval={0} />
                   <YAxis tickFormatter={(v) => '¥' + (v / 10000) + '万'} fontSize={11} width={56} />
                   <Tooltip formatter={(v) => formatYen(v)} />
                   <Legend />
