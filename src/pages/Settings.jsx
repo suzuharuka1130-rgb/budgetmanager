@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { getCredentials, saveCredentials, signOut, hasEnvCredentials, sendMonthlyReport, getSession } from '../lib/supabase'
 import {
-  fetchNotificationPreferences, upsertNotificationPreferences, setAppSetting, fetchAppSettings,
+  fetchNotificationPreferences, upsertNotificationPreferences, setAppSetting,
   addCard, updateCard, deactivateCard, setCardOrder,
   addOtherExpenseType, updateOtherExpenseType, deactivateOtherExpenseType, setOtherExpenseTypeOrder,
   createInvite, createLineLinkCode, setMyLineUserId,
@@ -10,6 +10,7 @@ import {
 import Modal from '../components/Modal'
 import { BalanceForm } from '../components/EntryForms'
 import MasterManager from '../components/MasterManager'
+import CustomNotificationManager from '../components/CustomNotificationManager'
 import BackupRestore from '../components/BackupRestore'
 import { useMeta } from '../lib/meta'
 import { useHousehold } from '../lib/household'
@@ -93,40 +94,6 @@ export default function Settings({ onCredentialsChange }) {
   })
   const [notifyLoading, setNotifyLoading] = useState(true)
   const [notifySaving, setNotifySaving] = useState(false)
-
-  // リマインダー文面（世帯ごと・app_settings に保存）
-  const [reminderMonthly, setReminderMonthly] = useState('')
-  const [reminderCredit, setReminderCredit] = useState('')
-  const [templatesSaving, setTemplatesSaving] = useState(false)
-  const [templatesSaved, setTemplatesSaved] = useState(false)
-
-  useEffect(() => {
-    async function loadTemplates() {
-      try {
-        const s = await fetchAppSettings()
-        setReminderMonthly(s.reminder_monthly_text || '')
-        setReminderCredit(s.reminder_credit_text || '')
-      } catch {
-        // 未接続時などは空のまま
-      }
-    }
-    loadTemplates()
-  }, [])
-
-  async function handleSaveTemplates(e) {
-    e.preventDefault()
-    setTemplatesSaving(true)
-    try {
-      await setAppSetting('reminder_monthly_text', reminderMonthly, household.householdId)
-      await setAppSetting('reminder_credit_text', reminderCredit, household.householdId)
-      setTemplatesSaved(true)
-      setTimeout(() => setTemplatesSaved(false), 2500)
-    } catch {
-      // ignore
-    } finally {
-      setTemplatesSaving(false)
-    }
-  }
 
   useEffect(() => {
     async function loadPrefs() {
@@ -270,55 +237,10 @@ export default function Settings({ onCredentialsChange }) {
                 disabled={notifySaving}
               />
             </label>
-            <label className="notify-toggle-row">
-              <span>支出入力リマインダー（毎月25日）</span>
-              <input
-                type="checkbox"
-                checked={notifyPrefs.monthly_reminder}
-                onChange={() => handleNotifyToggle('monthly_reminder')}
-                disabled={notifySaving}
-              />
-            </label>
-            <label className="notify-toggle-row">
-              <span>クレジット入力リマインダー（月末）</span>
-              <input
-                type="checkbox"
-                checked={notifyPrefs.credit_input_reminder}
-                onChange={() => handleNotifyToggle('credit_input_reminder')}
-                disabled={notifySaving}
-              />
-            </label>
           </div>
         )}
 
-        <h4 className="section-title" style={{ marginTop: '20px' }}>リマインダー文面のカスタマイズ</h4>
-        <p className="muted small">
-          支出入力・クレジット入力リマインダーで送信される文面です。空欄の場合は送信されません。
-        </p>
-        <form className="entry-form" onSubmit={handleSaveTemplates}>
-          <label className="field">
-            <span>支出入力リマインダー（毎月25日）</span>
-            <textarea
-              value={reminderMonthly}
-              onChange={(e) => setReminderMonthly(e.target.value)}
-              rows={5}
-              placeholder="例: 今月の支出をアプリに入力しましょう！"
-            />
-          </label>
-          <label className="field">
-            <span>クレジット入力リマインダー（月末）</span>
-            <textarea
-              value={reminderCredit}
-              onChange={(e) => setReminderCredit(e.target.value)}
-              rows={4}
-              placeholder="例: 今月使用したクレジット金額を入力してください。"
-            />
-          </label>
-          <button type="submit" className="btn primary" disabled={!connected || templatesSaving}>
-            {templatesSaving ? '保存中...' : '文面を保存'}
-          </button>
-          {templatesSaved && <p className="form-ok">保存しました。</p>}
-        </form>
+        <CustomNotificationManager userId={userId} connected={connected} />
 
         <h4 className="section-title" style={{ marginTop: '20px' }}>LINE通知テスト送信</h4>
         <p className="muted small">
@@ -368,37 +290,39 @@ export default function Settings({ onCredentialsChange }) {
         {!connected && <p className="muted small">※ 先に Supabase 接続情報を保存してください。</p>}
       </motion.div>
 
-      <motion.div className="card" variants={itemVariants}>
-        <h3 className="section-title">Supabase 接続情報</h3>
-        {hasEnvCredentials() ? (
-          <p className="muted small">
-            接続情報は環境変数（VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY）から読み込まれています。
-            すべての端末で自動的に接続されるため、ここでの入力は不要です。
-          </p>
-        ) : (
-          <>
+      {!connected && (
+        <motion.div className="card" variants={itemVariants}>
+          <h3 className="section-title">Supabase 接続情報</h3>
+          {hasEnvCredentials() ? (
             <p className="muted small">
-              ご自身の Supabase プロジェクトに接続します。入力した値はこのブラウザの localStorage に保存されます。
-              プロジェクト設定 → API から URL と anon public キーをコピーしてください。
-              初回はリポジトリ内の <code>supabase_schema.sql</code> を Supabase の SQL Editor で実行してテーブルを作成してください。
+              接続情報は環境変数（VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY）から読み込まれています。
+              すべての端末で自動的に接続されるため、ここでの入力は不要です。
             </p>
-            <form className="entry-form" onSubmit={handleSave}>
-              <label className="field">
-                <span>Supabase URL</span>
-                <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://xxxxx.supabase.co" required />
-              </label>
-              <label className="field">
-                <span>anon public キー</span>
-                <input type="text" value={anonKey} onChange={(e) => setAnonKey(e.target.value)}
-                  placeholder="eyJhbGci..." required />
-              </label>
-              <button type="submit" className="btn primary">保存</button>
-              {saved && <p className="form-ok">保存しました。</p>}
-            </form>
-          </>
-        )}
-      </motion.div>
+          ) : (
+            <>
+              <p className="muted small">
+                ご自身の Supabase プロジェクトに接続します。入力した値はこのブラウザの localStorage に保存されます。
+                プロジェクト設定 → API から URL と anon public キーをコピーしてください。
+                初回はリポジトリ内の <code>supabase_schema.sql</code> を Supabase の SQL Editor で実行してテーブルを作成してください。
+              </p>
+              <form className="entry-form" onSubmit={handleSave}>
+                <label className="field">
+                  <span>Supabase URL</span>
+                  <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://xxxxx.supabase.co" required />
+                </label>
+                <label className="field">
+                  <span>anon public キー</span>
+                  <input type="text" value={anonKey} onChange={(e) => setAnonKey(e.target.value)}
+                    placeholder="eyJhbGci..." required />
+                </label>
+                <button type="submit" className="btn primary">保存</button>
+                {saved && <p className="form-ok">保存しました。</p>}
+              </form>
+            </>
+          )}
+        </motion.div>
+      )}
 
       <motion.div variants={itemVariants}>
         <BackupRestore connected={connected} />

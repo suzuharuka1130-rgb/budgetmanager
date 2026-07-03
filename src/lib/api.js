@@ -352,3 +352,60 @@ export async function upsertNotificationPreferences(userId, prefs) {
     }, { onConflict: 'user_id' })
   if (error) throw error
 }
+
+// ---- カスタム通知 ----
+export async function fetchCustomNotifications() {
+  const { data, error } = await client()
+    .from('custom_notifications')
+    .select('*')
+    .order('created_at')
+  if (error) throw error
+  return data || []
+}
+
+export async function addCustomNotification({ content, day_of_month }) {
+  // household_id は trg_set_household トリガーで自動補完される
+  const { error } = await client()
+    .from('custom_notifications')
+    .insert({ content, day_of_month })
+  if (error) throw error
+}
+
+export async function updateCustomNotification(id, { content, day_of_month }) {
+  const { error } = await client()
+    .from('custom_notifications')
+    .update({ content, day_of_month, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteCustomNotification(id) {
+  const { error } = await client()
+    .from('custom_notifications')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function fetchCustomNotificationPrefs(userId) {
+  const { data, error } = await client()
+    .from('custom_notification_prefs')
+    .select('notification_id, enabled')
+    .eq('user_id', userId)
+  if (error) throw error
+  const map = {}
+  for (const row of data || []) map[row.notification_id] = row.enabled
+  return map // 行なし = ON（呼び出し側で !== false 判定）
+}
+
+export async function setCustomNotificationPref(userId, notificationId, enabled) {
+  const { error } = await client()
+    .from('custom_notification_prefs')
+    .upsert({
+      user_id: userId,
+      notification_id: notificationId,
+      enabled,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,notification_id' })
+  if (error) throw error
+}

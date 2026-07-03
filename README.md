@@ -144,8 +144,7 @@ Deploy notification and receipt functions:
 
 ```bash
 npx supabase functions deploy monthly-report
-npx supabase functions deploy monthly-reminder
-npx supabase functions deploy credit-input-reminder
+npx supabase functions deploy custom-reminder
 npx supabase functions deploy send-line-message
 npx supabase functions deploy analyze-receipt
 npx supabase functions deploy daily-backup
