@@ -100,7 +100,9 @@ export async function runDailyBackup() {
   return data // { success, filename, file_size }
 }
 
-// analyze-receipt Edge Function を呼び出し、画像から { amount, note } を抽出する
+// analyze-receipt Edge Function を呼び出し、画像から明細を抽出する。
+// 返り値: { amount, total, note, transactions: [{ name, amount, date }] }
+// （amount は total と同値の後方互換キー）
 export async function analyzeReceipt(base64Image, mimeType) {
   const c = getClient()
   if (!c) throw new Error('Supabase の接続情報が設定されていません。')
@@ -111,7 +113,7 @@ export async function analyzeReceipt(base64Image, mimeType) {
   if (!data || typeof data.amount === 'undefined') {
     throw new Error(data?.error || 'AI読み取りに失敗しました。')
   }
-  return data // { amount, note }
+  return data
 }
 
 // ログイン状態の変化を購読。解除用の関数を返す。

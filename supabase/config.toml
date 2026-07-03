@@ -9,10 +9,7 @@ project_id = "budgetmanager"
 verify_jwt = false
 
 # 以下はcron（pg_cron）から service role キーで起動するため検証OFF
-[functions.monthly-reminder]
-verify_jwt = false
-
-[functions.credit-input-reminder]
+[functions.custom-reminder]
 verify_jwt = false
 
 [functions.monthly-report]

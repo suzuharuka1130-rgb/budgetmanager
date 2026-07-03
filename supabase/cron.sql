@@ -1,7 +1,9 @@
 -- LINE通知のスケジュール設定（pg_cron + pg_net）
 -- Supabase の SQL Editor で実行してください。
--- 事前に Edge Functions（monthly-reminder / credit-input-reminder / monthly-report）を
+-- 事前に Edge Functions（custom-reminder / monthly-report / daily-backup）を
 -- デプロイし、下記のプレースホルダを置き換えてください。
+-- ※ 旧 monthly-reminder / credit-input-reminder は custom-reminder に統合されました。
+--    本ファイルを再実行すると旧ジョブは削除されます。
 --
 --   <PROJECT_REF>       : SupabaseプロジェクトのRef（例: abcdefghijklmno）
 --   <SERVICE_ROLE_KEY>  : service role キー（Settings → API）
@@ -28,14 +30,19 @@ do $$
 begin
   perform cron.unschedule('daily-backup');
 exception when others then null; end $$;
+do $$
+begin
+  perform cron.unschedule('custom-reminder');
+exception when others then null; end $$;
 
--- 1) 毎月25日 0:00 UTC（9:00 JST）— 支出入力リマインダー
+-- 1) 毎日 0:00 UTC（9:00 JST）— カスタム通知
+--    関数側で通知ごとの送信日（day_of_month）が今日（JST）かを判定して送信する
 select cron.schedule(
-  'monthly-reminder',
-  '0 0 25 * *',
+  'custom-reminder',
+  '0 0 * * *',
   $$
   select net.http_post(
-    url := 'https://<PROJECT_REF>.supabase.co/functions/v1/monthly-reminder',
+    url := 'https://<PROJECT_REF>.supabase.co/functions/v1/custom-reminder',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
@@ -45,24 +52,7 @@ select cron.schedule(
   $$
 );
 
--- 2) 毎月28-31日 0:00 UTC（9:00 JST）— クレジット入力リマインダー
---    関数側で「月末日」のみ送信するよう判定する
-select cron.schedule(
-  'credit-input-reminder',
-  '0 0 28-31 * *',
-  $$
-  select net.http_post(
-    url := 'https://<PROJECT_REF>.supabase.co/functions/v1/credit-input-reminder',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
-    ),
-    body := '{}'::jsonb
-  );
-  $$
-);
-
--- 3) 毎月1日 0:00 UTC（9:00 JST）— 月次レポート
+-- 2) 毎月1日 0:00 UTC（9:00 JST）— 月次レポート
 select cron.schedule(
   'monthly-report',
   '0 0 1 * *',
@@ -78,7 +68,7 @@ select cron.schedule(
   $$
 );
 
--- 4) 毎日 16:00 UTC（翌 1:00 JST）— 自動バックアップ（Google Drive へ）
+-- 3) 毎日 16:00 UTC（翌 1:00 JST）— 自動バックアップ（Google Drive へ）
 select cron.schedule(
   'daily-backup',
   '0 16 * * *',

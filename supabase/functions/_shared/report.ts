@@ -243,3 +243,16 @@ export function isLastDayOfMonthJST(): boolean {
   const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate()
   return d === lastDay
 }
+
+// 指定日（'1'..'31' または 'last'）が今日（JST）に該当するか。
+// 月の日数を超える指定（例: 2月に31）は月末日にクランプする。
+export function isReminderDayJST(day: string | null | undefined, fallback: string): boolean {
+  const setting = (day ?? '').trim() || fallback
+  const jst = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  const d = jst.getUTCDate()
+  const lastDay = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() + 1, 0)).getUTCDate()
+  if (setting === 'last') return d === lastDay
+  const n = parseInt(setting, 10)
+  if (!Number.isFinite(n) || n < 1 || n > 31) return false
+  return d === n || (n > lastDay && d === lastDay)
+}

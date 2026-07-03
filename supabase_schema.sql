@@ -52,6 +52,19 @@ create table if not exists card_expenses (
   created_at timestamptz not null default now()
 );
 
+-- カード明細の個別取引（1明細 = 複数取引。OCRで抽出／手動編集）
+-- 世帯分離RLS・household_id補完トリガーは migrations/card_expense_transactions.sql を参照。
+create table if not exists card_expense_transactions (
+  id bigint generated always as identity primary key,
+  card_expense_id bigint not null references card_expenses(id) on delete cascade,
+  household_id uuid,
+  name text not null default '',
+  amount numeric not null default 0 check (amount >= 0),
+  txn_date date,
+  display_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- その他支出
 create table if not exists other_expenses (
   id bigint generated always as identity primary key,

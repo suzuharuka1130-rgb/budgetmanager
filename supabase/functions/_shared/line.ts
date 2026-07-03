@@ -118,6 +118,29 @@ export async function householdLineRecipients(
     .map((m: { line_user_id: string }) => m.line_user_id)
 }
 
+// カスタム通知の送信対象LINE IDを返す（custom_notification_prefs に行なし = 既定ON）
+export async function customNotificationRecipients(
+  sb: { from: (t: string) => any },
+  householdId: string,
+  notificationId: string,
+): Promise<string[]> {
+  const { data: members } = await sb
+    .from('household_members')
+    .select('user_id, line_user_id')
+    .eq('household_id', householdId)
+  const withLine = (members ?? []).filter((m: { line_user_id?: string }) => !!m.line_user_id)
+  if (!withLine.length) return []
+  const { data: prefs } = await sb
+    .from('custom_notification_prefs')
+    .select('user_id, enabled')
+    .eq('notification_id', notificationId)
+    .in('user_id', withLine.map((m: { user_id: string }) => m.user_id))
+  const prefMap = new Map((prefs ?? []).map((p: { user_id: string; enabled: boolean }) => [p.user_id, p.enabled]))
+  return withLine
+    .filter((m: { user_id: string }) => prefMap.get(m.user_id) !== false)
+    .map((m: { line_user_id: string }) => m.line_user_id)
+}
+
 /**
  * 指定メッセージを各ユーザーへ個別に push 送信する。
  * userIds を渡さない場合は環境変数（ME / WIFE）から取得する。
