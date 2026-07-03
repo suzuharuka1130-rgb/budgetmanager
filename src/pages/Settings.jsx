@@ -229,7 +229,7 @@ export default function Settings({ onCredentialsChange }) {
         ) : (
           <div className="notify-toggles">
             <label className="notify-toggle-row">
-              <span>月次レポート（毎月1日）</span>
+              <span>月次レポート<span className="master-group">毎月1日</span></span>
               <input
                 type="checkbox"
                 checked={notifyPrefs.monthly_report}

@@ -159,10 +159,12 @@ body {
 .btn.primary:hover { background: var(--primary-dark); }
 
 .icon-btn {
-  border: none; background: none; font-size: 22px; line-height: 1;
-  cursor: pointer; color: var(--muted); padding: 2px 6px; border-radius: 6px;
+  border: none; background: none; line-height: 1;
+  cursor: pointer; color: var(--muted); padding: 6px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
 }
 .icon-btn:hover { background: var(--block); }
+.icon-btn svg { pointer-events: none; }
 
 /* 統計カード — フラット + 下線アクセント */
 .stat-grid {

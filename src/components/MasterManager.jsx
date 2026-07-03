@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Modal from './Modal'
 import { Button } from './ui/button'
+import { TrashIcon, EditIcon, ChevronUpIcon, ChevronDownIcon } from './icons'
 
 // カード / その他支出タイプ の共通管理UI（追加・編集・並べ替え・論理削除）
 // props:
@@ -109,10 +110,10 @@ export default function MasterManager({ title, addLabel, items, api, refresh, de
               {groupOptions && <span className="master-group">{groupLabel(item.report_group)}</span>}
             </span>
             <div className="master-actions">
-              <button className="icon-btn sm" onClick={() => move(i, -1)} disabled={i === 0 || busyId} title="上へ">▲</button>
-              <button className="icon-btn sm" onClick={() => move(i, 1)} disabled={i === items.length - 1 || busyId} title="下へ">▼</button>
-              <button className="icon-btn sm" onClick={() => openEdit(item)} title="編集">✎</button>
-              <button className="icon-btn sm" onClick={() => setConfirmDelete(item)} title="削除">🗑</button>
+              <button className="icon-btn sm" onClick={() => move(i, -1)} disabled={i === 0 || busyId} title="上へ"><ChevronUpIcon /></button>
+              <button className="icon-btn sm" onClick={() => move(i, 1)} disabled={i === items.length - 1 || busyId} title="下へ"><ChevronDownIcon /></button>
+              <button className="icon-btn sm" onClick={() => openEdit(item)} title="編集"><EditIcon /></button>
+              <button className="icon-btn sm" onClick={() => setConfirmDelete(item)} title="削除"><TrashIcon /></button>
             </div>
           </li>
         ))}

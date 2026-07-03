@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Modal from './Modal'
 import { Button } from './ui/button'
+import { TrashIcon, EditIcon } from './icons'
 import {
   fetchCustomNotifications, addCustomNotification, updateCustomNotification,
   deleteCustomNotification, fetchCustomNotificationPrefs, setCustomNotificationPref,
@@ -12,6 +13,8 @@ const DAY_OPTIONS = [
   { value: 'last', label: '月末' },
 ]
 const dayLabel = (d) => (d === 'last' ? '月末' : `毎月${d}日`)
+// 一覧表示用に先頭の絵文字を取り除く（保存されている本文自体は変更しない）
+const previewText = (content) => content.split('\n')[0].replace(/^[\p{Extended_Pictographic}️\s]+/u, '')
 
 // カスタム通知の管理UI（追加・編集・削除・自分への通知ON/OFF）
 // 通知は世帯単位、ON/OFF はメンバー単位（行なし = ON）。
@@ -116,12 +119,12 @@ export default function CustomNotificationManager({ userId, connected }) {
           {items.map((item) => (
             <li key={item.id} className="master-row">
               <span className="master-name">
-                {item.content.split('\n')[0]}
+                {previewText(item.content)}
                 <span className="master-group">{dayLabel(item.day_of_month)}</span>
               </span>
               <div className="master-actions">
-                <button className="icon-btn sm" onClick={() => openEdit(item)} title="編集">✎</button>
-                <button className="icon-btn sm" onClick={() => setConfirmDelete(item)} title="削除">🗑</button>
+                <button className="icon-btn sm" onClick={() => openEdit(item)} title="編集"><EditIcon /></button>
+                <button className="icon-btn sm" onClick={() => setConfirmDelete(item)} title="削除"><TrashIcon /></button>
               </div>
               <input
                 type="checkbox"
@@ -163,7 +166,7 @@ export default function CustomNotificationManager({ userId, connected }) {
       <Modal open={!!confirmDelete} title="削除の確認" onClose={() => !busyId && setConfirmDelete(null)}>
         {confirmDelete && (
           <div className="confirm-body">
-            <p>「{confirmDelete.content.split('\n')[0]}」を削除しますか？</p>
+            <p>「{previewText(confirmDelete.content)}」を削除しますか？</p>
             <p className="muted small">この通知はすべてのメンバーに送信されなくなります。</p>
             <div className="confirm-actions">
               <Button type="button" variant="outline" className="flex-1" onClick={() => setConfirmDelete(null)} disabled={!!busyId}>キャンセル</Button>
