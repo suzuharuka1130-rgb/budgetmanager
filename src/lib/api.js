@@ -406,18 +406,18 @@ export async function fetchCustomNotifications() {
   return data || []
 }
 
-export async function addCustomNotification({ content, day_of_month }) {
+export async function addCustomNotification({ content, day_of_month, include_app_link = false }) {
   // household_id は trg_set_household トリガーで自動補完される
   const { error } = await client()
     .from('custom_notifications')
-    .insert({ content, day_of_month })
+    .insert({ content, day_of_month, include_app_link })
   if (error) throw error
 }
 
-export async function updateCustomNotification(id, { content, day_of_month }) {
+export async function updateCustomNotification(id, { content, day_of_month, include_app_link = false }) {
   const { error } = await client()
     .from('custom_notifications')
-    .update({ content, day_of_month, updated_at: new Date().toISOString() })
+    .update({ content, day_of_month, include_app_link, updated_at: new Date().toISOString() })
     .eq('id', id)
   if (error) throw error
 }

@@ -25,6 +25,7 @@ export default function CustomNotificationManager({ userId, connected }) {
   const [editing, setEditing] = useState(null) // null | {} (new) | item (edit)
   const [day, setDay] = useState('1')
   const [content, setContent] = useState('')
+  const [includeLink, setIncludeLink] = useState(false)
   const [formError, setFormError] = useState(null)
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
@@ -54,12 +55,14 @@ export default function CustomNotificationManager({ userId, connected }) {
     setEditing({})
     setDay('1')
     setContent('')
+    setIncludeLink(false)
     setFormError(null)
   }
   function openEdit(item) {
     setEditing(item)
     setDay(item.day_of_month)
     setContent(item.content)
+    setIncludeLink(!!item.include_app_link)
     setFormError(null)
   }
 
@@ -71,9 +74,9 @@ export default function CustomNotificationManager({ userId, connected }) {
     setFormError(null)
     try {
       if (editing && editing.id) {
-        await updateCustomNotification(editing.id, { content: trimmed, day_of_month: day })
+        await updateCustomNotification(editing.id, { content: trimmed, day_of_month: day, include_app_link: includeLink })
       } else {
-        await addCustomNotification({ content: trimmed, day_of_month: day })
+        await addCustomNotification({ content: trimmed, day_of_month: day, include_app_link: includeLink })
       }
       await load()
       setEditing(null)
@@ -156,6 +159,14 @@ export default function CustomNotificationManager({ userId, connected }) {
               rows={5}
               placeholder="例: 今月の支出をアプリに入力しましょう！"
               required
+            />
+          </label>
+          <label className="notify-toggle-row" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+            <span>メッセージに「Kakeiboを開く」ボタンを追加</span>
+            <input
+              type="checkbox"
+              checked={includeLink}
+              onChange={(e) => setIncludeLink(e.target.checked)}
             />
           </label>
           {formError && <p className="form-error">{formError}</p>}
