@@ -171,6 +171,7 @@ Set secrets in Supabase (Settings → Edge Functions → Secrets):
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API channel access token |
 | `LINE_USER_ID_ME` | Your LINE user ID |
 | `LINE_USER_ID_WIFE` | Partner's LINE user ID |
+| `APP_URL` | *(optional)* Deployed app URL for the "Kakeiboを開く" button on the 月次レポート LINE message; defaults to the project's Vercel URL |
 | `USER_EMAIL_ME` | Your login email (default: suzu.haruka1130@gmail.com) |
 | `USER_EMAIL_WIFE` | Partner's login email |
 | `GEMINI_API_KEY` | Google Gemini API key (for receipt analysis) |
