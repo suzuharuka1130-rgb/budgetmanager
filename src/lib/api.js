@@ -22,24 +22,28 @@ export async function fetchMonth(year, month) {
 
   const balance = await computeBalanceAt(c, year, month, allBalances.data || [])
 
-  // 各カード明細に個別取引があるか（行クリックの判定用）。単一列の軽量クエリ。
+  // 各明細に個別取引があるか（行クリックの判定用）。単一列の軽量クエリ。
   const cardRows = cards.data || []
-  let txnIds = new Set()
-  if (cardRows.length) {
-    const { data: txns, error: txErr } = await c
-      .from('card_expense_transactions')
-      .select('card_expense_id')
-      .in('card_expense_id', cardRows.map((r) => r.id))
-    if (txErr) throw txErr
-    txnIds = new Set((txns || []).map((t) => t.card_expense_id))
-  }
+  const otherRows = others.data || []
+  const [cardTxnIds, otherTxnIds] = await Promise.all([
+    fetchTxnParentIds(c, 'card_expense_transactions', 'card_expense_id', cardRows.map((r) => r.id)),
+    fetchTxnParentIds(c, 'other_expense_transactions', 'other_expense_id', otherRows.map((r) => r.id)),
+  ])
 
   return {
     income: income.data || [],
-    cards: cardRows.map((r) => ({ ...r, has_transactions: txnIds.has(r.id) })),
-    others: others.data || [],
+    cards: cardRows.map((r) => ({ ...r, has_transactions: cardTxnIds.has(r.id) })),
+    others: otherRows.map((r) => ({ ...r, has_transactions: otherTxnIds.has(r.id) })),
     balance,
   }
+}
+
+// 指定テーブルで、渡した親IDのうち個別取引が存在するものの集合を返す。
+async function fetchTxnParentIds(c, table, parentCol, parentIds) {
+  if (!parentIds.length) return new Set()
+  const { data, error } = await c.from(table).select(parentCol).in(parentCol, parentIds)
+  if (error) throw error
+  return new Set((data || []).map((row) => row[parentCol]))
 }
 
 // (year, month) 時点の口座残高を、手入力スナップショット + 各月の純増減から算出する。
@@ -151,32 +155,54 @@ export async function addCardExpense({ year, month, card_id, amount, note, recei
   return data.id
 }
 
-// カード明細の個別取引を一括挿入する（household_id はトリガーで自動補完）。
+// 個別取引の行を挿入用に整形する（household_id はトリガーで自動補完）。
 // 空行（名前・金額・日付いずれも無い）は除外する。
-export async function addCardExpenseTransactions(cardExpenseId, transactions) {
-  const rows = (transactions || [])
+function buildTxnRows(parentCol, parentId, transactions) {
+  return (transactions || [])
     .map((t, i) => ({
-      card_expense_id: cardExpenseId,
+      [parentCol]: parentId,
       name: (t.name || '').trim(),
       amount: Number(t.amount) || 0,
       txn_date: t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : null,
       display_order: i,
     }))
     .filter((r) => r.name !== '' || r.amount > 0 || r.txn_date !== null)
+}
+
+async function insertTransactions(table, rows) {
   if (rows.length === 0) return
-  const { error } = await client().from('card_expense_transactions').insert(rows)
+  const { error } = await client().from(table).insert(rows)
   if (error) throw error
+}
+
+async function fetchTransactions(table, parentCol, parentId) {
+  const { data, error } = await client()
+    .from(table)
+    .select('id, name, amount, txn_date, display_order')
+    .eq(parentCol, parentId)
+    .order('display_order')
+  if (error) throw error
+  return data || []
+}
+
+// カード明細の個別取引を一括挿入する。
+export async function addCardExpenseTransactions(cardExpenseId, transactions) {
+  await insertTransactions('card_expense_transactions', buildTxnRows('card_expense_id', cardExpenseId, transactions))
 }
 
 // 指定カード明細の個別取引を取得する（詳細モーダルを開いたとき遅延取得）。
 export async function fetchCardExpenseTransactions(cardExpenseId) {
-  const { data, error } = await client()
-    .from('card_expense_transactions')
-    .select('id, name, amount, txn_date, display_order')
-    .eq('card_expense_id', cardExpenseId)
-    .order('display_order')
-  if (error) throw error
-  return data || []
+  return fetchTransactions('card_expense_transactions', 'card_expense_id', cardExpenseId)
+}
+
+// その他支出の個別取引を一括挿入する。
+export async function addOtherExpenseTransactions(otherExpenseId, transactions) {
+  await insertTransactions('other_expense_transactions', buildTxnRows('other_expense_id', otherExpenseId, transactions))
+}
+
+// 指定その他支出の個別取引を取得する（詳細モーダルを開いたとき遅延取得）。
+export async function fetchOtherExpenseTransactions(otherExpenseId) {
+  return fetchTransactions('other_expense_transactions', 'other_expense_id', otherExpenseId)
 }
 
 // ---- レシート画像（Supabase Storage: receipts バケット）----
@@ -203,10 +229,13 @@ export async function getReceiptSignedUrl(path, expiresIn = 60) {
 
 export async function addOtherExpense({ year, month, expense_type_id, amount, note }) {
   const confirmed = !isFutureMonth(year, month)
-  const { error } = await client()
+  const { data, error } = await client()
     .from('other_expenses')
     .insert({ year, month, expense_type_id, amount, note, confirmed })
+    .select('id')
+    .single()
   if (error) throw error
+  return data.id
 }
 
 export async function setAccountBalance({ year, month, balance }) {

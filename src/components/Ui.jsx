@@ -4,7 +4,7 @@ import { formatYen, monthLabel } from '../lib/helpers'
 import {
   deleteIncome, deleteCardExpense, deleteOtherExpense,
   confirmIncome, confirmCardExpense, confirmOtherExpense,
-  getReceiptSignedUrl, fetchCardExpenseTransactions,
+  getReceiptSignedUrl, fetchCardExpenseTransactions, fetchOtherExpenseTransactions,
 } from '../lib/api'
 import { useMeta } from '../lib/meta'
 import Modal from './Modal'
@@ -41,8 +41,8 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
   const pending = (r) => r.confirmed === false
   const rows = [
     ...income.map((r) => ({ id: 'i' + r.id, dbId: r.id, table: 'income', kind: '入金', label: '入金', amount: r.amount, note: r.note, color: '#0ea5e9', sign: '+', pending: pending(r) })),
-    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: cardName(r.card_id), amount: r.amount, note: r.note, color: cardColor(r.card_id), sign: '-', pending: pending(r), receiptPath: r.receipt_image_url, cardExpenseId: r.id, detailable: !!r.has_transactions || !!r.receipt_image_url })),
-    ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: typeName(r.expense_type_id), amount: r.amount, note: r.note, color: typeColor(r.expense_type_id), sign: '-', pending: pending(r) })),
+    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: cardName(r.card_id), amount: r.amount, note: r.note, color: cardColor(r.card_id), sign: '-', pending: pending(r), receiptPath: r.receipt_image_url, expenseId: r.id, txnKind: 'card', detailable: !!r.has_transactions || !!r.receipt_image_url })),
+    ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: typeName(r.expense_type_id), amount: r.amount, note: r.note, color: typeColor(r.expense_type_id), sign: '-', pending: pending(r), expenseId: r.id, txnKind: 'other', detailable: !!r.has_transactions })),
   ]
 
   async function performConfirm(r) {
@@ -90,8 +90,8 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
       <ul className="entry-list">
         <AnimatePresence initial={false}>
           {rows.map((r, i) => {
-            const clickable = r.table === 'cards' && r.detailable
-            const openDetails = () => setDetails({ cardExpenseId: r.cardExpenseId, receiptPath: r.receiptPath, label: r.label, amount: r.amount })
+            const clickable = (r.table === 'cards' || r.table === 'others') && r.detailable
+            const openDetails = () => setDetails({ expenseId: r.expenseId, txnKind: r.txnKind, receiptPath: r.receiptPath, label: r.label, amount: r.amount })
             return (
             <motion.li
               key={r.id}
@@ -173,7 +173,8 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
       <TransactionDetailsModal
         open={!!details}
         onClose={() => setDetails(null)}
-        cardExpenseId={details?.cardExpenseId}
+        expenseId={details?.expenseId}
+        txnKind={details?.txnKind}
         receiptPath={details?.receiptPath}
         label={details?.label}
         amount={details?.amount}
@@ -189,23 +190,24 @@ function formatTxnDate(isoDate) {
   return m && d ? `${m}/${d}` : isoDate
 }
 
-// カード明細の取引一覧＋スクリーンショットを表示する（閲覧専用）モーダル
-function TransactionDetailsModal({ open, onClose, cardExpenseId, receiptPath, label, amount }) {
+// カード支出・その他支出の取引一覧（＋カードのみスクリーンショット）を表示する（閲覧専用）モーダル
+function TransactionDetailsModal({ open, onClose, expenseId, txnKind, receiptPath, label, amount }) {
   const [txns, setTxns] = useState(null) // null=未取得, []=空
   const [loadError, setLoadError] = useState(null)
   const [receipt, setReceipt] = useState(null) // { url, loading, error }
 
   useEffect(() => {
-    if (!open || cardExpenseId == null) return
+    if (!open || expenseId == null) return
     let alive = true
     setTxns(null)
     setLoadError(null)
     setReceipt(null)
-    fetchCardExpenseTransactions(cardExpenseId)
+    const fetchTxns = txnKind === 'other' ? fetchOtherExpenseTransactions : fetchCardExpenseTransactions
+    fetchTxns(expenseId)
       .then((data) => { if (alive) setTxns(data) })
       .catch((err) => { if (alive) setLoadError(err.message || String(err)) })
     return () => { alive = false }
-  }, [open, cardExpenseId])
+  }, [open, expenseId, txnKind])
 
   async function openReceipt() {
     setReceipt({ url: null, loading: true, error: null })
