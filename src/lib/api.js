@@ -46,6 +46,38 @@ async function fetchTxnParentIds(c, table, parentCol, parentIds) {
   return new Set((data || []).map((row) => row[parentCol]))
 }
 
+// 選択月の個別取引（カード＋その他、txn_date基準）を日別カレンダー用に取得する。
+// 親明細が未確定（未来月入力）のものは除外。txn_date未設定の取引は対象外。
+export async function fetchMonthTransactions(year, month) {
+  const c = client()
+  const start = `${year}-${String(month).padStart(2, '0')}-01`
+  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 }
+  const end = `${next.y}-${String(next.m).padStart(2, '0')}-01`
+
+  const [cardTxns, otherTxns] = await Promise.all([
+    c.from('card_expense_transactions')
+      .select('id, name, amount, txn_date, card_expenses!inner(card_id, confirmed)')
+      .gte('txn_date', start).lt('txn_date', end)
+      .eq('card_expenses.confirmed', true),
+    c.from('other_expense_transactions')
+      .select('id, name, amount, txn_date, other_expenses!inner(expense_type_id, confirmed)')
+      .gte('txn_date', start).lt('txn_date', end)
+      .eq('other_expenses.confirmed', true),
+  ])
+  if (cardTxns.error) throw cardTxns.error
+  if (otherTxns.error) throw otherTxns.error
+
+  const fromCards = (cardTxns.data || []).map((t) => ({
+    id: 'c' + t.id, name: t.name, amount: Number(t.amount) || 0, date: t.txn_date,
+    kind: 'card', groupId: t.card_expenses.card_id,
+  }))
+  const fromOthers = (otherTxns.data || []).map((t) => ({
+    id: 'o' + t.id, name: t.name, amount: Number(t.amount) || 0, date: t.txn_date,
+    kind: 'other', groupId: t.other_expenses.expense_type_id,
+  }))
+  return [...fromCards, ...fromOthers]
+}
+
 // (year, month) 時点の口座残高を、手入力スナップショット + 各月の純増減から算出する。
 // 当月にスナップショットがあればそれを実測値として採用。無ければ最後の
 // スナップショットを起点に、それ以降の月の純増減（入金 − 支出）を積み上げる。
