@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { currentYearMonth, toMonthValue, fromMonthValue } from '../lib/helpers'
 import { addIncome, addCardExpense, addCardExpenseTransactions, addOtherExpense, addOtherExpenseTransactions, setAccountBalance, uploadReceipt } from '../lib/api'
 import { analyzeReceipt } from '../lib/supabase'
@@ -10,12 +10,44 @@ function sumTxns(list) {
   return (list || []).reduce((s, t) => s + (Number(t.amount) || 0), 0)
 }
 
-// OCRが読み取った「日にち」と対象月（年・月）を組み合わせてYYYY-MM-DDを作る。
-// 年・月はスクリーンショットに写っていなくても対象月から補える。
-function buildDateFromDay(monthVal, day) {
-  if (!day) return ''
-  const { year, month } = fromMonthValue(monthVal)
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+// year/month に対して delta ヶ月ぶんずらした {year, month} を返す
+function addMonths(year, month, delta) {
+  const total = year * 12 + (month - 1) + delta
+  return { year: Math.floor(total / 12), month: (total % 12) + 1 }
+}
+
+// 'YYYY-MM-DD' を delta ヶ月ぶんずらす（日にちはそのまま）
+function shiftDateByMonths(dateStr, delta) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const { year, month } = addMonths(y, m, delta)
+  return `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+// OCRで抽出した取引一覧（新しい順を想定）から、実際の購入日を推定する。
+// カードの利用代金は翌月に引き落とされるため、既定値は対象月の前月。
+// 日にちが直前の取引より大きくなった時点で月をまたいだとみなし、1ヶ月遡る。
+// Geminiが month/year を読み取れていれば、そちらを優先する。
+function resolveExtractedDates(monthVal, rawTransactions) {
+  const { year: targetYear, month: targetMonth } = fromMonthValue(monthVal)
+  let { year: curYear, month: curMonth } = addMonths(targetYear, targetMonth, -1)
+  let prevDay = null
+  return (rawTransactions || []).map((t) => {
+    const day = t.day ? Number(t.day) : null
+    const explicitMonth = t.month ? Number(t.month) : null
+    const explicitYear = t.year ? Number(t.year) : null
+    if (explicitMonth && explicitYear) {
+      curYear = explicitYear
+      curMonth = explicitMonth
+    } else if (day != null && prevDay != null && day > prevDay) {
+      ;({ year: curYear, month: curMonth } = addMonths(curYear, curMonth, -1))
+    }
+    if (day != null) prevDay = day
+    return {
+      name: t.name || '',
+      amount: t.amount != null ? String(Math.round(Number(t.amount) || 0)) : '',
+      date: day != null ? `${curYear}-${String(curMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '',
+    }
+  })
 }
 
 // 画像を縮小して JPEG base64（プレフィックス除去）に変換する。
@@ -108,10 +140,13 @@ function NoteField({ value, onChange }) {
 
 // 明細（カード支出・その他支出）の取引リストと金額の連動を扱う共通フック。
 // txns が空のまま保存すれば従来どおり単一の合計のみの入力として保存される。
-function useTransactionEditor(monthVal) {
+// deferredBilling: true の場合（カード支出）、対象月を変更した際に取引日を「差分ヶ月」シフトする
+// （複数月にまたがる取引の相対関係を保つ）。false（その他支出）なら従来どおり対象月に統一する。
+function useTransactionEditor(monthVal, { deferredBilling = false } = {}) {
   const [txns, setTxns] = useState([]) // [{ name, amount(string), date }]
   const [amount, setAmountState] = useState('')
   const [amountManual, setAmountManual] = useState(false) // 金額を手入力したら true（自動合計を止める）
+  const prevMonthValRef = useRef(monthVal)
 
   // 金額フィールドの手入力（AmountField.onChange はユーザー操作でのみ発火）
   function setAmount(v) {
@@ -148,12 +183,24 @@ function useTransactionEditor(monthVal) {
     setAmountState(total ? String(Math.round(total)) : '')
   }
 
-  // 対象月を変更したら、既存の取引日の「日にち」部分は保ったまま年・月だけ差し替える
+  // 対象月を変更したら、既存の取引日を更新する。
   useEffect(() => {
-    const { year, month } = fromMonthValue(monthVal)
-    const ym = `${year}-${String(month).padStart(2, '0')}`
-    setTxns((prev) => prev.map((t) => (t.date ? { ...t, date: `${ym}-${t.date.slice(-2)}` } : t)))
-  }, [monthVal])
+    const prevMonthVal = prevMonthValRef.current
+    prevMonthValRef.current = monthVal
+    if (prevMonthVal === monthVal) return
+    if (deferredBilling) {
+      // 複数月にまたがる取引の相対関係を保ったまま、差分ヶ月だけ全取引日をシフトする
+      const a = fromMonthValue(monthVal)
+      const b = fromMonthValue(prevMonthVal)
+      const delta = (a.year - b.year) * 12 + (a.month - b.month)
+      setTxns((prev) => prev.map((t) => (t.date ? { ...t, date: shiftDateByMonths(t.date, delta) } : t)))
+    } else {
+      // 従来の挙動: 取引日の「日にち」部分は保ったまま年・月を対象月に統一する
+      const { year, month } = fromMonthValue(monthVal)
+      const ym = `${year}-${String(month).padStart(2, '0')}`
+      setTxns((prev) => prev.map((t) => (t.date ? { ...t, date: `${ym}-${t.date.slice(-2)}` } : t)))
+    }
+  }, [monthVal, deferredBilling])
 
   return { txns, amount, amountManual, setAmount, updateTxn, addTxn, removeTxn, resetAmountToSum, clearTxns, fillFromExtraction }
 }
@@ -255,7 +302,7 @@ export function CardExpenseForm({ onSaved }) {
   const { activeCards } = useMeta()
   const [monthVal, setMonthVal] = useMonthState()
   const [cardId, setCardId] = useState('')
-  const editor = useTransactionEditor(monthVal)
+  const editor = useTransactionEditor(monthVal, { deferredBilling: true })
   const [note, setNote] = useState('')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -296,11 +343,7 @@ export function CardExpenseForm({ onSaved }) {
     try {
       const base64 = await downscaleImageToBase64(file)
       const res = await analyzeReceipt(base64, 'image/jpeg')
-      const list = (res.transactions || []).map((t) => ({
-        name: t.name || '',
-        amount: t.amount != null ? String(Math.round(Number(t.amount) || 0)) : '',
-        date: buildDateFromDay(monthVal, t.day),
-      }))
+      const list = resolveExtractedDates(monthVal, res.transactions)
       const total = list.length ? sumTxns(list) : (res.total ?? res.amount ?? 0)
       editor.fillFromExtraction(list, total)
       setNote(res.note || '')
