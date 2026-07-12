@@ -8,6 +8,7 @@ import ThisMonth from './pages/ThisMonth'
 import MonthlyReport from './pages/MonthlyReport'
 import YearlySummary from './pages/YearlySummary'
 import Trends from './pages/Trends'
+import CalendarPage from './pages/Calendar'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
 
@@ -50,6 +51,19 @@ const TrendIcon = () => (
     <path d="M16 4h5v5" />
   </Svg>
 )
+const CalendarDaysIcon = () => (
+  <Svg>
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <line x1="3" y1="9" x2="21" y2="9" />
+    <line x1="8" y1="3" x2="8" y2="6" />
+    <line x1="16" y1="3" x2="16" y2="6" />
+    <line x1="7" y1="13" x2="7" y2="13" />
+    <line x1="12" y1="13" x2="12" y2="13" />
+    <line x1="17" y1="13" x2="17" y2="13" />
+    <line x1="7" y1="17" x2="7" y2="17" />
+    <line x1="12" y1="17" x2="12" y2="17" />
+  </Svg>
+)
 const GearIcon = () => (
   <Svg>
     <circle cx="12" cy="12" r="3.6" />
@@ -69,6 +83,7 @@ const TABS = [
   { key: 'month', label: '月次', Icon: CalendarIcon },
   { key: 'year', label: '年次', Icon: BarIcon },
   { key: 'trend', label: 'トレンド', Icon: TrendIcon },
+  { key: 'calendar', label: 'カレンダー', Icon: CalendarDaysIcon },
   { key: 'settings', label: '設定', Icon: GearIcon },
 ]
 
@@ -119,6 +134,7 @@ export default function App() {
       case 'month': return <MonthlyReport />
       case 'year': return <YearlySummary />
       case 'trend': return <Trends />
+      case 'calendar': return <CalendarPage />
       case 'settings': return <Settings onCredentialsChange={handleConnected} />
       default: return null
     }

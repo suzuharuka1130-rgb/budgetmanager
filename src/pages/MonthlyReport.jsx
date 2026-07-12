@@ -1,9 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { fetchMonth, fetchMonthTransactions, fetchAvailableYears } from '../lib/api'
+import { fetchMonth, fetchAvailableYears } from '../lib/api'
 import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR } from '../lib/helpers'
 import { StatCard, Loading, ErrorMsg, EntryList } from '../components/Ui'
-import MonthlyCalendar from '../components/MonthlyCalendar'
 import { useMeta } from '../lib/meta'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
@@ -24,7 +23,6 @@ export default function MonthlyReport() {
   const [year, setYear] = useState(cur.year)
   const [month, setMonth] = useState(cur.month)
   const [data, setData] = useState(null)
-  const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -38,12 +36,7 @@ export default function MonthlyReport() {
     setLoading(true)
     setError(null)
     try {
-      const [monthData, txns] = await Promise.all([
-        fetchMonth(year, month),
-        fetchMonthTransactions(year, month),
-      ])
-      setData(monthData)
-      setTransactions(txns)
+      setData(await fetchMonth(year, month))
     } catch (e) {
       setError(e)
     } finally {
@@ -104,11 +97,6 @@ export default function MonthlyReport() {
           <motion.div variants={itemVariants}>
             <h3 className="section-title">明細</h3>
             <EntryList income={data.income} cards={data.cards} others={data.others} onRefresh={load} />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <h3 className="section-title">カレンダー</h3>
-            <MonthlyCalendar year={year} month={month} transactions={transactions} />
           </motion.div>
         </motion.div>
       )}

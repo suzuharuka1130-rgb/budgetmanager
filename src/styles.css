@@ -115,6 +115,11 @@ body {
 }
 .tab-icon { display: flex; align-items: center; justify-content: center; }
 .tab-icon svg { width: 22px; height: 22px; }
+.tab-label { white-space: nowrap; }
+@media (max-width: 380px) {
+  .tab { font-size: 10px; padding: 6px 2px; }
+  .tab-icon svg { width: 20px; height: 20px; }
+}
 
 /* ページ共通 */
 .page { display: flex; flex-direction: column; gap: 6px; }
@@ -407,7 +412,17 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
 .txn-table tfoot td { font-weight: 700; border-bottom: none; }
 .txn-receipt { margin-top: 16px; }
 
-/* 月次レポート: 日別カレンダー */
+/* カレンダーページ: 月ナビゲーション */
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.cal-nav-label { font-size: 15px; font-weight: 600; min-width: 120px; text-align: center; }
+
+/* カレンダーページ / 日別カレンダー */
 .cal-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
