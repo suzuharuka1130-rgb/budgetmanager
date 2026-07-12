@@ -8,17 +8,28 @@ Built for two users to manage shared finances from mobile or desktop.
 
 ### Core budgeting
 - **今月 (This Month)** — Quick entry for deposits, card expenses, and other spending; view monthly balance and auto-calculated account balance
-- **月次 (Monthly Report)** — Month-by-month breakdown of income, expenses, and net balance
+- **月次 (Monthly Report)** — Month-by-month breakdown of income, expenses, and net balance (organized by 対象月, the billing/withdrawal month)
 - **年次 (Yearly Summary)** — Annual totals with income vs. spending bar chart
 - **トレンド (Trends)** — Balance trend, per-card spending, and variable expense charts
+- **カレンダー (Calendar)** — Day-by-day view of individual transactions by their *actual* purchase
+  date (separate from 月次レポート's 対象月-based view, since the two can legitimately differ — see
+  below). Each day shows color-coded amount chips grouped by card/expense type; tap a day for a
+  detail list. Navigate months with ‹ › arrows or by tapping the month label to pick a year/month directly.
 
 ### Expense tracking
 - Dynamic **card** and **other expense type** masters (manageable in Settings)
 - Card statement screenshot upload with **Gemini Vision** auto-extraction — reads each individual
   transaction (name, amount, date) plus the total, all editable before saving; 金額 auto-sums the
   extracted transactions but can be overridden manually
-- Click a card expense row in the 明細 list to view its saved transactions (and the original
-  screenshot) in a read-only detail modal
+- Extracted transaction dates resolve to the **actual purchase date**, not 対象月 — since card
+  purchases are withdrawn the month *after* use, and a single statement can span more than one
+  calendar month. A day-order rollover heuristic infers the real month per transaction (trusting
+  an explicit date from the screenshot when one is visible); changing 対象月 afterward shifts all
+  transaction dates by the same delta, preserving any multi-month spread
+- その他支出 (other expense) entry is transaction-first: no separate 金額 field — amount is derived
+  from one or more transaction row(s) (name/amount/date), starting with one blank row ready to fill in
+- Click a card or other-expense row in the 明細 list to view its saved transactions (and, for
+  card expenses, the original screenshot) in a read-only detail modal
 - Future-month entries stay **pending** until confirmed (won't affect balance until confirmed)
 - Delete entries from the detail list (hover on desktop, tap on mobile)
 
@@ -83,9 +94,10 @@ Each key under `tables` holds the full row set for that table. On restore, only 
 (`cards`, `other_expense_types`, `monthly_income`, `card_expenses`, `other_expenses`,
 `account_balance`, `app_settings`) are rewritten and reassigned to the current household.
 
-> **Known limitation:** `card_expense_transactions` (per-transaction OCR detail) and the custom
-> notification tables (`custom_notifications`, `custom_notification_prefs`) are not yet included
-> in backup/restore. Restoring regenerates `card_expenses` row IDs, so transaction detail rows
+> **Known limitation:** `card_expense_transactions` / `other_expense_transactions` (per-transaction
+> detail, used by 明細's detail modal and the カレンダー page) and the custom notification tables
+> (`custom_notifications`, `custom_notification_prefs`) are not yet included in backup/restore.
+> Restoring regenerates `card_expenses`/`other_expenses` row IDs, so transaction detail rows
 > (keyed by the old ID) would be orphaned — this needs an ID-remap step before it can be added safely.
 
 ## Tech stack
@@ -103,8 +115,8 @@ Each key under `tables` holds the full row set for that table. On restore, only 
 
 ```
 ├── src/
-│   ├── pages/          # ThisMonth, MonthlyReport, YearlySummary, Trends, Settings, Login
-│   ├── components/     # EntryForms, Ui, Modal, MasterManager
+│   ├── pages/          # ThisMonth, MonthlyReport, YearlySummary, Trends, Calendar, Settings, Login
+│   ├── components/     # EntryForms, Ui, MonthlyCalendar, Modal, MasterManager
 │   └── lib/            # api.js, supabase.js, helpers.js, meta.jsx
 ├── supabase/
 │   ├── functions/      # Edge Functions (monthly-report, custom-reminder, analyze-receipt, daily-backup, etc.)
