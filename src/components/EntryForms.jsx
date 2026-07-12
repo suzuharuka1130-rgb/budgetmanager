@@ -102,10 +102,10 @@ function validateAmount(value) {
   return null
 }
 
-function MonthField({ value, onChange }) {
+function MonthField({ value, onChange, label = '引き落とし対象月' }) {
   return (
     <label className="field">
-      <span>対象月</span>
+      <span>{label}</span>
       <input type="month" value={value} onChange={(e) => onChange(e.target.value)} required />
     </label>
   )
@@ -142,8 +142,8 @@ function NoteField({ value, onChange }) {
 // txns が空のまま保存すれば従来どおり単一の合計のみの入力として保存される。
 // deferredBilling: true の場合（カード支出）、対象月を変更した際に取引日を「差分ヶ月」シフトする
 // （複数月にまたがる取引の相対関係を保つ）。false（その他支出）なら従来どおり対象月に統一する。
-function useTransactionEditor(monthVal, { deferredBilling = false } = {}) {
-  const [txns, setTxns] = useState([]) // [{ name, amount(string), date }]
+function useTransactionEditor(monthVal, { deferredBilling = false, startWithBlankRow = false } = {}) {
+  const [txns, setTxns] = useState(startWithBlankRow ? [{ name: '', amount: '', date: '' }] : []) // [{ name, amount(string), date }]
   const [amount, setAmountState] = useState('')
   const [amountManual, setAmountManual] = useState(false) // 金額を手入力したら true（自動合計を止める）
   const prevMonthValRef = useRef(monthVal)
@@ -205,11 +205,11 @@ function useTransactionEditor(monthVal, { deferredBilling = false } = {}) {
   return { txns, amount, amountManual, setAmount, updateTxn, addTxn, removeTxn, resetAmountToSum, clearTxns, fillFromExtraction }
 }
 
-// 取引明細の行編集UI（名前・金額・日付・削除 + 追加ボタン）。空のままでもよい任意項目。
-function TransactionEditor({ txns, updateTxn, addTxn, removeTxn, namePlaceholder }) {
+// 取引明細の行編集UI（名前・金額・日付・削除 + 追加ボタン）。
+function TransactionEditor({ txns, updateTxn, addTxn, removeTxn, namePlaceholder, label = '取引明細（任意・編集可）' }) {
   return (
     <div className="field">
-      <span>取引明細（任意・編集可）</span>
+      <span>{label}</span>
       <div className="txn-editor">
         {txns.map((t, i) => (
           <div key={i} className="txn-row">
@@ -247,12 +247,18 @@ function TransactionEditor({ txns, updateTxn, addTxn, removeTxn, namePlaceholder
 
 // 金額フィールド + 「合計に戻す」リンク + 取引明細エディタをまとめたブロック。
 // カード支出・その他支出フォームで共通利用する。
-function AmountAndTransactions({ editor, namePlaceholder, amountLabel }) {
+// showAmountField=false の場合（その他支出）、金額は取引明細の合計から自動算出され、
+// 単独の金額フィールドは表示しない（二重入力を避けるため）。
+function AmountAndTransactions({ editor, namePlaceholder, amountLabel, showAmountField = true, transactionsLabel }) {
   return (
     <>
-      <AmountField value={editor.amount} onChange={editor.setAmount} label={amountLabel} />
-      {editor.amountManual && editor.txns.length > 0 && (
-        <button type="button" className="btn-link" onClick={editor.resetAmountToSum}>取引の合計に戻す</button>
+      {showAmountField && (
+        <>
+          <AmountField value={editor.amount} onChange={editor.setAmount} label={amountLabel} />
+          {editor.amountManual && editor.txns.length > 0 && (
+            <button type="button" className="btn-link" onClick={editor.resetAmountToSum}>取引の合計に戻す</button>
+          )}
+        </>
       )}
       <TransactionEditor
         txns={editor.txns}
@@ -260,6 +266,7 @@ function AmountAndTransactions({ editor, namePlaceholder, amountLabel }) {
         addTxn={editor.addTxn}
         removeTxn={editor.removeTxn}
         namePlaceholder={namePlaceholder}
+        label={transactionsLabel}
       />
     </>
   )
@@ -291,7 +298,7 @@ export function IncomeForm({ onSaved }) {
 
   return (
     <FormShell onSubmit={handleSubmit} submitting={submitting} error={error}>
-      <MonthField value={monthVal} onChange={setMonthVal} />
+      <MonthField value={monthVal} onChange={setMonthVal} label="入金月" />
       <AmountField value={amount} onChange={setAmount} label="入金額（円）" />
       <NoteField value={note} onChange={setNote} />
     </FormShell>
@@ -439,7 +446,7 @@ export function OtherExpenseForm({ onSaved }) {
   const { activeOtherTypes } = useMeta()
   const [monthVal, setMonthVal] = useMonthState()
   const [typeId, setTypeId] = useState('')
-  const editor = useTransactionEditor(monthVal)
+  const editor = useTransactionEditor(monthVal, { startWithBlankRow: true })
   const [note, setNote] = useState('')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -488,7 +495,12 @@ export function OtherExpenseForm({ onSaved }) {
           ))}
         </select>
       </label>
-      <AmountAndTransactions editor={editor} namePlaceholder="内容" />
+      <AmountAndTransactions
+        editor={editor}
+        namePlaceholder="内容"
+        showAmountField={false}
+        transactionsLabel="取引明細"
+      />
 
       <NoteField value={note} onChange={setNote} />
       {warning && <p className="form-warning">{warning}</p>}
