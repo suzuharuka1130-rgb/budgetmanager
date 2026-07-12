@@ -77,6 +77,19 @@ create table if not exists other_expenses (
   created_at timestamptz not null default now()
 );
 
+-- その他支出の個別取引（1明細 = 複数取引。手動編集）
+-- 世帯分離RLS・household_id補完トリガーは migrations/other_expense_transactions.sql を参照。
+create table if not exists other_expense_transactions (
+  id bigint generated always as identity primary key,
+  other_expense_id bigint not null references other_expenses(id) on delete cascade,
+  household_id uuid,
+  name text not null default '',
+  amount numeric not null default 0 check (amount >= 0),
+  txn_date date,
+  display_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- 初期データ（既存の表示名・色）
 insert into cards (id, name, color, display_order, report_group) values
   ('11111111-1111-1111-1111-111111111111', 'STARTS（家賃・ガス・水道・電気）', '#2563eb', 1, 'housing'),

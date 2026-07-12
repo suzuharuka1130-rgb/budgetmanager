@@ -1,6 +1,7 @@
 // レシート/明細画像を Gemini Vision で解析し { amount, total, note, transactions } を返す。
-// transactions は個別取引の配列 [{ name, amount, day }]（amount=total は後方互換キー）。
-// day は日にちのみ（1〜31、年月は不要）。年月はアプリ側の対象月から補完する。
+// transactions は個別取引の配列 [{ name, amount, day, month, year }]（amount=total は後方互換キー）。
+// day は日にちのみ（1〜31）。month/year は画面に実際に表示されている場合のみ埋める（読み取れなければ空文字）。
+// month/year が空の取引は、アプリ側で対象月と日にちの並び順から実際の購入月を推定する。
 // Body: { "image": "<base64>", "mimeType"?: "image/jpeg" | "image/png" }
 // ブラウザ（カード支出フォーム）から呼ばれるため CORS 対応 + JWT 手動検証。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -17,7 +18,7 @@ const PROMPT = `この画像はクレジットカードの利用明細または�
   "total": 合計金額を数値のみで（カンマや円記号なし）,
   "note": "下記ルールに従った簡潔なメモ（該当しなければ空文字）",
   "transactions": [
-    { "name": "利用先または内容", "amount": 金額を数値のみで, "day": "日にちのみを1〜31の数値で" }
+    { "name": "利用先または内容", "amount": 金額を数値のみで, "day": "日にちのみを1〜31の数値で", "month": "月（1〜12）。画面に表示されている場合のみ", "year": "西暦4桁。画面に表示されている場合のみ" }
   ]
 }
 
@@ -25,7 +26,8 @@ const PROMPT = `この画像はクレジットカードの利用明細または�
 - 画像から読み取れる個別の利用明細を、1件ずつ配列に列挙してください。
 - name は利用先・店舗名・内容を簡潔に。読み取れない場合は空文字（""）。
 - amount は各利用の金額を数値のみで（カンマや円記号なし）。
-- day は各取引の「日にち」のみを1〜31の数値で（例: 26日なら26）。年・月の情報は画面になくても構いません（年・月は別途アプリ側で補います）。日にちが読み取れない場合は空文字（""）にしてください。
+- day は各取引の「日にち」のみを1〜31の数値で（例: 26日なら26）。日にちが読み取れない場合は空文字（""）にしてください。
+- month と year は、日付見出しや各行の日付表示など画面に実際に月・年の情報がある場合のみ埋めてください。画面に日にちしか表示されていない場合は、month・year とも必ず空文字（""）にしてください（推測しないこと）。
 - 合計行・繰越・手数料など個別の利用でない行は含めないでください。
 
 【totalのルール】
@@ -48,7 +50,8 @@ async function isAuthenticated(req: Request): Promise<boolean> {
   return !error && !!data?.user
 }
 
-type Txn = { name: string; amount: number; day: string } // day: '1'..'31' または ''
+// day: '1'..'31' または ''。month/year は画面に表示されている場合のみ埋まる（それ以外は ''）。
+type Txn = { name: string; amount: number; day: string; month: string; year: string }
 type Parsed = { total: number; note: string; transactions: Txn[] }
 
 // マークダウンのコードフェンスを除去して JSON を取り出す
@@ -71,10 +74,16 @@ function parseJson(text: string): Parsed | null {
         const amount = Number(it?.amount)
         const dayNum = Number(it?.day)
         const day = Number.isInteger(dayNum) && dayNum >= 1 && dayNum <= 31 ? String(dayNum) : ''
+        const monthNum = Number(it?.month)
+        const month = Number.isInteger(monthNum) && monthNum >= 1 && monthNum <= 12 ? String(monthNum) : ''
+        const yearNum = Number(it?.year)
+        const year = Number.isInteger(yearNum) && yearNum >= 2000 && yearNum <= 2100 ? String(yearNum) : ''
         return {
           name: typeof it?.name === 'string' ? it.name : '',
           amount: Number.isFinite(amount) ? amount : 0,
           day,
+          month,
+          year,
         }
       })
       .filter((it: Txn) => it.name !== '' || it.amount > 0 || it.day !== '')
