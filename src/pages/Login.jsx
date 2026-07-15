@@ -80,7 +80,7 @@ export default function Login({ connected, onConnected }) {
   return (
     <div className="login-screen">
       <div className="login-card">
-        <h1 className="login-title">HarukaとChiChanの家計管理</h1>
+        <h1 className="login-title">Kakeibo Login</h1>
         {connected
           ? <LoginForm />
           : <SetupForm onConnected={onConnected} />}

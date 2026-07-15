@@ -78,6 +78,34 @@ export async function fetchMonthTransactions(year, month) {
   return [...fromCards, ...fromOthers]
 }
 
+// 個別取引（txn_date基準、親が確定済みのもののみ）が存在する最新の年月を返す。
+// カレンダーページの初期表示月に使う。取引が1件もなければ null。
+export async function fetchLatestTransactionMonth() {
+  const c = client()
+  const [cardTxn, otherTxn] = await Promise.all([
+    c.from('card_expense_transactions')
+      .select('txn_date, card_expenses!inner(confirmed)')
+      .eq('card_expenses.confirmed', true)
+      .not('txn_date', 'is', null)
+      .order('txn_date', { ascending: false })
+      .limit(1),
+    c.from('other_expense_transactions')
+      .select('txn_date, other_expenses!inner(confirmed)')
+      .eq('other_expenses.confirmed', true)
+      .not('txn_date', 'is', null)
+      .order('txn_date', { ascending: false })
+      .limit(1),
+  ])
+  if (cardTxn.error) throw cardTxn.error
+  if (otherTxn.error) throw otherTxn.error
+
+  const dates = [cardTxn.data?.[0]?.txn_date, otherTxn.data?.[0]?.txn_date].filter(Boolean)
+  if (!dates.length) return null
+  const latest = dates.sort().at(-1) // 'YYYY-MM-DD' は文字列比較で日付順になる
+  const [year, month] = latest.split('-').map(Number)
+  return { year, month }
+}
+
 // (year, month) 時点の口座残高を、手入力スナップショット + 各月の純増減から算出する。
 // 当月にスナップショットがあればそれを実測値として採用。無ければ最後の
 // スナップショットを起点に、それ以降の月の純増減（入金 − 支出）を積み上げる。

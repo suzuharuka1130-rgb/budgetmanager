@@ -195,7 +195,8 @@ body {
 
 /* セレクタ */
 .selector-row { display: flex; gap: 8px; margin-bottom: 8px; }
-select, textarea, input[type="month"], input[type="number"], input[type="text"], input[type="url"] {
+select, textarea, input[type="month"], input[type="number"], input[type="text"], input[type="url"],
+input[type="email"], input[type="password"] {
   font-size: 15px;
   padding: 9px 10px;
   border: 1px solid var(--border);
@@ -602,11 +603,12 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
 .login-card {
   width: 100%;
   max-width: 380px;
-  background: var(--surface);
+  background: var(--block);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 28px 24px;
 }
+.onboard-wrap { width: 100%; max-width: 380px; }
 .login-title {
   font-size: 22px;
   font-weight: 700;

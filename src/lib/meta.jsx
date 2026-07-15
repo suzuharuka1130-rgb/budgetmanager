@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { fetchCards, fetchOtherExpenseTypes, fetchAppSettings } from './api'
 
-const DEFAULT_TITLE = 'Haruka ChiChan Kakeibo'
+const DEFAULT_TITLE = 'Kakeibo'
 
 const MetaContext = createContext(null)
 
