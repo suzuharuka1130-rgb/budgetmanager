@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { fetchMonthTransactions, fetchAvailableYears } from '../lib/api'
+import { fetchMonthTransactions, fetchAvailableYears, fetchLatestTransactionMonth } from '../lib/api'
 import { currentYearMonth, monthLabel } from '../lib/helpers'
 import { Loading, ErrorMsg } from '../components/Ui'
 import MonthlyCalendar from '../components/MonthlyCalendar'
@@ -33,6 +33,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
     fetchAvailableYears()
@@ -40,7 +41,23 @@ export default function CalendarPage() {
       .catch(() => {})
   }, [cur.year])
 
+  // 初回表示は「取引が存在する最新月」を既定にする（無ければ当月のまま）
+  useEffect(() => {
+    let alive = true
+    fetchLatestTransactionMonth()
+      .then((latest) => {
+        if (!alive || !latest) return
+        setYear(latest.year)
+        setMonth(latest.month)
+      })
+      .catch(() => {})
+      .finally(() => { if (alive) setInitializing(false) })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const load = useCallback(async () => {
+    if (initializing) return
     setLoading(true)
     setError(null)
     try {
@@ -50,7 +67,7 @@ export default function CalendarPage() {
     } finally {
       setLoading(false)
     }
-  }, [year, month])
+  }, [year, month, initializing])
 
   useEffect(() => { load() }, [load])
 

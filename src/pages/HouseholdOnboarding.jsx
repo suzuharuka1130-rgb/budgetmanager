@@ -39,25 +39,30 @@ export default function HouseholdOnboarding({ onDone }) {
 
   return (
     <div className="login-screen">
-      <div className="login-card">
+      <div className="onboard-wrap">
         <h1 className="login-title">家計の設定</h1>
-        <form className="entry-form" onSubmit={join}>
-          <label className="field">
-            <span>招待コードを入力してください</span>
-            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="8桁のコード" />
-          </label>
-          <Button type="submit" className="w-full" disabled={busy || !code.trim()}>参加する</Button>
-        </form>
+
+        <div className="card">
+          <form className="entry-form" onSubmit={join}>
+            <label className="field">
+              <span>招待コードを入力してください</span>
+              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="8桁のコード" />
+            </label>
+            <Button type="submit" className="w-full" disabled={busy || !code.trim()}>参加する</Button>
+          </form>
+        </div>
 
         <div className="onboard-divider"><span>または</span></div>
 
-        <form className="entry-form" onSubmit={create}>
-          <label className="field">
-            <span>新しい家計の名前（任意）</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="例: 我が家" />
-          </label>
-          <Button type="submit" variant="outline" className="w-full" disabled={busy}>新しい家計を作成する</Button>
-        </form>
+        <div className="card">
+          <form className="entry-form" onSubmit={create}>
+            <label className="field">
+              <span>新しい家計の名前（任意）</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="例: 我が家" />
+            </label>
+            <Button type="submit" variant="outline" className="w-full" disabled={busy}>新しい家計を作成する</Button>
+          </form>
+        </div>
 
         {error && <p className="form-error" style={{ marginTop: 12 }}>{error}</p>}
       </div>

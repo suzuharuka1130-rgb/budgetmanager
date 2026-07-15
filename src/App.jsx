@@ -140,29 +140,33 @@ export default function App() {
     }
   }
 
-  const header = (
-    <header className="app-header">
-      <svg className="app-logo" viewBox="0 0 64 64" fill="none" stroke="#166534"
-        strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        {/* coin stack */}
-        <ellipse cx="22" cy="13" rx="9" ry="3.2" />
-        <path d="M13 13v6c0 1.8 4 3.2 9 3.2s9-1.4 9-3.2v-6" />
-        <path d="M13 19v6c0 1.8 4 3.2 9 3.2s9-1.4 9-3.2v-6" />
-        {/* house */}
-        <path d="M10 34 32 18l22 16" />
-        <path d="M16 32v22h32V32" />
-        <rect x="27" y="40" width="10" height="14" />
-        <rect x="38" y="38" width="7" height="7" />
-      </svg>
-      <h1>{meta.appTitle}</h1>
-    </header>
-  )
+  // ログイン前後で共通のヘッダー。title はログイン前の画面（認証確認中・ログイン・
+  // 世帯確認中・世帯未所属）では固定で "Kakeibo"、アプリ本体では世帯ごとの設定値を使う。
+  function renderHeader(title) {
+    return (
+      <header className="app-header">
+        <svg className="app-logo" viewBox="0 0 64 64" fill="none" stroke="#166534"
+          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {/* coin stack */}
+          <ellipse cx="22" cy="13" rx="9" ry="3.2" />
+          <path d="M13 13v6c0 1.8 4 3.2 9 3.2s9-1.4 9-3.2v-6" />
+          <path d="M13 19v6c0 1.8 4 3.2 9 3.2s9-1.4 9-3.2v-6" />
+          {/* house */}
+          <path d="M10 34 32 18l22 16" />
+          <path d="M16 32v22h32V32" />
+          <rect x="27" y="40" width="10" height="14" />
+          <rect x="38" y="38" width="7" height="7" />
+        </svg>
+        <h1>{title}</h1>
+      </header>
+    )
+  }
 
   // 認証確認中
   if (connected && !authChecked) {
     return (
       <div className="app">
-        {header}
+        {renderHeader('Kakeibo')}
         <main className="app-main"><div className="state-msg">読み込み中...</div></main>
       </div>
     )
@@ -172,7 +176,7 @@ export default function App() {
   if (!connected || !session) {
     return (
       <div className="app">
-        {header}
+        {renderHeader('Kakeibo')}
         <main className="app-main">
           <Login connected={connected} onConnected={handleConnected} />
         </main>
@@ -184,7 +188,7 @@ export default function App() {
   if (household.loading || household.householdId === undefined) {
     return (
       <div className="app">
-        {header}
+        {renderHeader('Kakeibo')}
         <main className="app-main"><div className="state-msg">読み込み中...</div></main>
       </div>
     )
@@ -194,7 +198,7 @@ export default function App() {
   if (!household.hasHousehold) {
     return (
       <div className="app">
-        {header}
+        {renderHeader('Kakeibo')}
         <main className="app-main">
           <HouseholdOnboarding onDone={handleHouseholdJoined} />
         </main>
@@ -205,7 +209,7 @@ export default function App() {
   // ログイン済み・世帯あり → アプリ本体
   return (
     <div className="app">
-      {header}
+      {renderHeader(meta.appTitle)}
 
       <main className="app-main">
         <AnimatePresence mode="wait">
