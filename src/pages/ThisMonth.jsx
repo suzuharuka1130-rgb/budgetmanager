@@ -67,11 +67,11 @@ export default function ThisMonth() {
         <div className="hero-month">{monthLabel(year, month)}</div>
         <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', marginTop: '6px' }}>
           <div className="hero-remaining" style={{ marginTop: 0 }}>
-            <span>今月の残額</span>
+            <span>今月の収支</span>
             <strong style={{ color: remaining >= 0 ? '#16a34a' : '#dc2626' }}>{formatYen(remaining)}</strong>
           </div>
           <div className="hero-remaining" style={{ marginTop: 0 }}>
-            <span>現在の口座残高</span>
+            <span>口座残高</span>
             <strong>
               {data.balance ? formatYen(data.balance.balance) : '未入力'}
             </strong>
