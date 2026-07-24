@@ -1,10 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { fetchMonthTransactions, fetchAvailableYears, fetchLatestTransactionMonth } from '../lib/api'
-import { currentYearMonth, monthLabel } from '../lib/helpers'
+import { currentYearMonth } from '../lib/helpers'
 import { Loading, ErrorMsg } from '../components/Ui'
 import MonthlyCalendar from '../components/MonthlyCalendar'
-import Modal from '../components/Modal'
 import { ChevronLeftIcon, ChevronRightIcon } from '../components/icons'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
@@ -32,7 +31,6 @@ export default function CalendarPage() {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [pickerOpen, setPickerOpen] = useState(false)
   const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
@@ -85,28 +83,20 @@ export default function CalendarPage() {
   return (
     <div className="page">
       <h2 className="page-title">カレンダー</h2>
-      <div className="cal-nav">
+      <div className="cal-nav selector-row selector-row--chip">
         <button type="button" className="icon-btn" onClick={goPrev} aria-label="前の月">
           <ChevronLeftIcon />
         </button>
-        <button type="button" className="cal-nav-label" onClick={() => setPickerOpen(true)}>
-          {monthLabel(year, month)}
-        </button>
+        <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
+        </select>
+        <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+          {MONTHS.map((m) => <option key={m} value={m}>{m}月</option>)}
+        </select>
         <button type="button" className="icon-btn" onClick={goNext} aria-label="次の月">
           <ChevronRightIcon />
         </button>
       </div>
-
-      <Modal open={pickerOpen} title="年月を選択" onClose={() => setPickerOpen(false)}>
-        <div className="selector-row">
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {years.map((y) => <option key={y} value={y}>{y}年</option>)}
-          </select>
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-            {MONTHS.map((m) => <option key={m} value={m}>{m}月</option>)}
-          </select>
-        </div>
-      </Modal>
 
       {loading ? <Loading /> : error ? <ErrorMsg error={error} /> : (
         <motion.div variants={containerVariants} initial="hidden" animate="show">

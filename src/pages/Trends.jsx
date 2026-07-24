@@ -97,11 +97,13 @@ export default function Trends() {
 
   return (
     <div className="page">
-      <h2 className="page-title">トレンド</h2>
-      <div className="selector-row">
-        <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
-        </select>
+      <div className="page-header">
+        <h2 className="page-title">トレンド</h2>
+        <div className="selector-row selector-row--chip">
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {years.map((y) => <option key={y} value={y}>{y}年</option>)}
+          </select>
+        </div>
       </div>
 
       {loading ? <Loading /> : error ? <ErrorMsg error={error} /> : (

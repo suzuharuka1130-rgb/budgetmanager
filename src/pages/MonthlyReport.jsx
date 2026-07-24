@@ -59,14 +59,16 @@ export default function MonthlyReport() {
 
   return (
     <div className="page">
-      <h2 className="page-title">月次レポート</h2>
-      <div className="selector-row">
-        <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
-        </select>
-        <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-          {MONTHS.map((m) => <option key={m} value={m}>{m}月</option>)}
-        </select>
+      <div className="page-header">
+        <h2 className="page-title">月次レポート</h2>
+        <div className="selector-row selector-row--chip">
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {years.map((y) => <option key={y} value={y}>{y}年</option>)}
+          </select>
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            {MONTHS.map((m) => <option key={m} value={m}>{m}月</option>)}
+          </select>
+        </div>
       </div>
 
       {loading ? <Loading /> : error ? <ErrorMsg error={error} /> : (

@@ -168,6 +168,66 @@ body {
 /* ページ共通 */
 .page { display: flex; flex-direction: column; gap: 6px; }
 .page-title { font-size: 22px; font-weight: 700; margin: 6px 0 10px; letter-spacing: -0.01em; }
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0 10px;
+  min-width: 0;
+}
+.page-header .page-title {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+}
+.page-header .selector-row {
+  margin-bottom: 0;
+  flex-shrink: 0;
+  align-items: center;
+}
+/* チップ風セレクト — フォーム入力ではなくナビ操作感（ページヘッダー / カレンダーナビ） */
+.selector-row--chip {
+  align-items: center;
+}
+.selector-row--chip select {
+  -webkit-appearance: none;
+  appearance: none;
+  width: auto;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 6px 28px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background-color: var(--block);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23787774' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.selector-row--chip select:hover {
+  background-color: var(--hover);
+}
+.selector-row--chip select:focus {
+  border-color: var(--primary);
+}
+:root[data-theme="dark"] .selector-row--chip select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239b9a97' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+/* カレンダー: ヘッダー下・中央寄せの年月ナビ */
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.cal-nav.selector-row { margin-bottom: 10px; }
 .section-title { font-size: 14px; color: var(--text); margin: 18px 0 6px; font-weight: 600; }
 .subsection-title {
   font-size: 12px;
@@ -479,29 +539,6 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
 .txn-table .txn-amount-col { text-align: right; white-space: nowrap; }
 .txn-table tfoot td { font-weight: 700; border-bottom: none; }
 .txn-receipt { margin-top: 16px; }
-
-/* カレンダーページ: 月ナビゲーション */
-.cal-nav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.cal-nav-label {
-  font-size: 15px;
-  font-weight: 600;
-  min-width: 120px;
-  text-align: center;
-  color: var(--text);
-  background: none;
-  border: none;
-  border-radius: 6px;
-  padding: 4px 8px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.cal-nav-label:hover { background: var(--block); }
 
 /* カレンダーページ / 日別カレンダー */
 .cal-weekdays {

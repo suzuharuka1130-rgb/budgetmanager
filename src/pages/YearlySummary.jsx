@@ -15,9 +15,39 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
 }
 
+// SP 判定（既存の 600px ブレークポイントに合わせる）
+function useIsMobile(breakpoint = 600) {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches
+      : false
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    const onChange = () => setIsMobile(mq.matches)
+    onChange()
+    if (mq.addEventListener) mq.addEventListener('change', onChange)
+    else mq.addListener(onChange)
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', onChange)
+      else mq.removeListener(onChange)
+    }
+  }, [breakpoint])
+  return isMobile
+}
+
+// 凡例用（SP）: 「STARTS（家賃・光熱費）」→「STARTS」、長い名前は maxLen 文字で省略
+function shortCardName(name, maxLen = 8) {
+  if (!name) return name
+  const stripped = name.replace(/[（(].*$/, '').trim() || name
+  if (stripped.length <= maxLen) return stripped
+  return stripped.slice(0, maxLen) + '…'
+}
+
 export default function YearlySummary() {
   const cur = currentYearMonth()
   const { cards } = useMeta()
+  const isMobile = useIsMobile()
   const [years, setYears] = useState([cur.year])
   const [year, setYear] = useState(cur.year)
   const [data, setData] = useState(null)
@@ -65,31 +95,39 @@ export default function YearlySummary() {
   let totalOther = 0
   if (data) {
     for (const c of relevantCards) cardTotals[c.id] = 0
-    chartData = Array.from({ length: 12 }, (_, i) => {
+    const allMonths = Array.from({ length: 12 }, (_, i) => {
       const m = i + 1
       const income = sumAmount(data.income.filter((r) => r.month === m))
       const otherExp = sumAmount(data.others.filter((r) => r.month === m))
       totalIncome += income
       totalOther += otherExp
-      const row = { name: `${m}月`, 入金: income, その他: otherExp }
+      const row = { name: `${m}月`, shortName: String(m), 入金: income, その他: otherExp }
+      let cardSum = 0
       for (const c of relevantCards) {
         const v = sumAmount(data.cards.filter((r) => r.month === m && r.card_id === c.id))
         row[`c_${c.id}`] = v
         cardTotals[c.id] += v
+        cardSum += v
       }
+      row._hasData = income > 0 || otherExp > 0 || cardSum > 0
       return row
     })
+    // グラフはデータのある月だけ表示（空月でバーが細くなるのを防ぐ）
+    chartData = allMonths.filter((r) => r._hasData)
   }
   const totalCards = Object.values(cardTotals).reduce((a, b) => a + b, 0)
   const netSavings = totalIncome - totalCards - totalOther
+  const chartHeight = isMobile ? 380 : 340
 
   return (
     <div className="page">
-      <h2 className="page-title">年次サマリー</h2>
-      <div className="selector-row">
-        <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
-        </select>
+      <div className="page-header">
+        <h2 className="page-title">年次サマリー</h2>
+        <div className="selector-row selector-row--chip">
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {years.map((y) => <option key={y} value={y}>{y}年</option>)}
+          </select>
+        </div>
       </div>
 
       {loading ? <Loading /> : error ? <ErrorMsg error={error} /> : (
@@ -102,22 +140,57 @@ export default function YearlySummary() {
           <motion.div className="chart-card" variants={itemVariants}>
             <h3 className="section-title">月別 入金 vs 支出（カード別内訳）</h3>
             {showChart ? (
-              <ResponsiveContainer width="100%" height={340}>
-                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={chartHeight}>
+                <BarChart
+                  data={chartData}
+                  margin={isMobile ? { top: 8, right: 4, left: 0, bottom: 0 } : { top: 8, right: 8, left: 8, bottom: 0 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
-                  <XAxis dataKey="name" fontSize={12} interval={0} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
-                  <YAxis tickFormatter={(v) => '¥' + (v / 10000) + '万'} fontSize={11} width={56} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
-                  <Tooltip formatter={(v) => formatYen(v)} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} labelStyle={{ color: 'var(--text)' }} itemStyle={{ color: 'var(--text)' }} />
-                  <Legend />
+                  <XAxis
+                    dataKey={isMobile ? 'shortName' : 'name'}
+                    fontSize={isMobile ? 11 : 12}
+                    interval={0}
+                    stroke="var(--chart-axis)"
+                    tick={{ fill: 'var(--chart-axis)' }}
+                  />
+                  <YAxis
+                    tickFormatter={(v) => (isMobile ? `${v / 10000}万` : `¥${v / 10000}万`)}
+                    fontSize={11}
+                    width={isMobile ? 40 : 56}
+                    stroke="var(--chart-axis)"
+                    tick={{ fill: 'var(--chart-axis)' }}
+                  />
+                  <Tooltip
+                    formatter={(v) => formatYen(v)}
+                    labelFormatter={(label) => (isMobile ? `${label}月` : label)}
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                    labelStyle={{ color: 'var(--text)' }}
+                    itemStyle={{ color: 'var(--text)' }}
+                  />
+                  <Legend
+                    wrapperStyle={isMobile ? { fontSize: 11 } : undefined}
+                    formatter={(value) => {
+                      if (!isMobile) return value
+                      if (value === 'その他支出') return 'その他'
+                      if (value === '入金') return value
+                      return shortCardName(value)
+                    }}
+                  />
                   <Bar dataKey="入金" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
                   {relevantCards.map((c) => (
-                    <Bar key={c.id} dataKey={`c_${c.id}`} name={c.name} stackId="spend" fill={c.color} />
+                    <Bar
+                      key={c.id}
+                      dataKey={`c_${c.id}`}
+                      name={c.name}
+                      stackId="spend"
+                      fill={c.color}
+                    />
                   ))}
                   <Bar dataKey="その他" name="その他支出" stackId="spend" fill={OTHER_COLOR} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div style={{ height: 340 }} />
+              <div style={{ height: chartHeight }} />
             )}
           </motion.div>
 
