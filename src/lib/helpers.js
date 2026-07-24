@@ -2,6 +2,15 @@
 // カード/その他支出タイプは cards / other_expense_types テーブルで動的管理（meta.jsx 参照）
 
 export const OTHER_COLOR = '#6b7280' // その他支出（集計）の色
+export const EXPENSE_TOTAL_COLOR = '#b45353' // 支出合計（くすんだ赤。その他のグレーと区別）
+
+// チャート凡例用（SP）: 「STARTS（家賃・光熱費）」→「STARTS」、長い名前は maxLen 文字で省略
+export function shortCardName(name, maxLen = 8) {
+  if (!name) return name
+  const stripped = name.replace(/[（(].*$/, '').trim() || name
+  if (stripped.length <= maxLen) return stripped
+  return stripped.slice(0, maxLen) + '…'
+}
 
 export function formatYen(value) {
   const n = Number(value) || 0

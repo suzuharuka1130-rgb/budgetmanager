@@ -14,6 +14,7 @@ import CustomNotificationManager from '../components/CustomNotificationManager'
 import BackupRestore from '../components/BackupRestore'
 import { useMeta } from '../lib/meta'
 import { useHousehold } from '../lib/household'
+import { useTheme } from '../lib/theme'
 
 const containerVariants = {
   hidden: {},
@@ -28,6 +29,7 @@ export default function Settings({ onCredentialsChange }) {
   const initial = getCredentials()
   const meta = useMeta()
   const household = useHousehold()
+  const { theme, setTheme } = useTheme()
   const [url, setUrl] = useState(initial.url)
   const [anonKey, setAnonKey] = useState(initial.anonKey)
   const [saved, setSaved] = useState(false)
@@ -326,6 +328,38 @@ export default function Settings({ onCredentialsChange }) {
 
       <motion.div variants={itemVariants}>
         <BackupRestore connected={connected} />
+      </motion.div>
+
+      <motion.div className="card" variants={itemVariants}>
+        <h3 className="section-title">表示モード</h3>
+        <p className="muted small">表示モードを選択してください。</p>
+        <div className="segmented" role="group" aria-label="表示モード">
+          {[
+            { key: 'light', label: 'ライト' },
+            { key: 'dark', label: 'ダーク' },
+            { key: 'auto', label: '自動' },
+          ].map((opt) => {
+            const active = theme === opt.key
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                className={active ? 'active' : ''}
+                aria-pressed={active}
+                onClick={() => setTheme(opt.key)}
+              >
+                {active && (
+                  <motion.span
+                    className="segmented-active-pill"
+                    layoutId="theme-active-pill"
+                    transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                  />
+                )}
+                <span className="segmented-label">{opt.label}</span>
+              </button>
+            )
+          })}
+        </div>
       </motion.div>
 
       <motion.div className="card" variants={itemVariants}>

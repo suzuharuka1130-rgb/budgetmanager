@@ -14,8 +14,8 @@ export function StatCard({ label, value, color, accent, layout }) {
   const isRow = layout === 'row'
   return (
     <div className={`stat-card ${isRow ? 'row-layout' : ''}`} style={accent ? { borderBottomColor: color } : undefined}>
-      <div className="stat-label" style={isRow ? { marginBottom: 0 } : undefined}>{label}</div>
-      <div className="stat-value" style={color ? { color, marginTop: isRow ? 0 : '6px' } : undefined}>{value}</div>
+      <div className="stat-label">{label}</div>
+      <div className="stat-value" style={color ? { color } : undefined}>{value}</div>
     </div>
   )
 }
@@ -114,7 +114,7 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
                 </div>
                 {r.note && <span className="entry-note muted">{r.note}</span>}
               </div>
-              <span className="entry-amount" style={{ color: r.pending ? '#9b9a97' : (r.sign === '+' ? '#0ea5e9' : '#111') }}>
+              <span className="entry-amount" style={{ color: r.pending ? 'var(--muted)' : (r.sign === '+' ? '#0ea5e9' : 'var(--text)') }}>
                 {r.sign}{formatYen(r.amount)}
               </span>
               {onRefresh && r.pending && (

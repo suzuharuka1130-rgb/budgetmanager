@@ -12,20 +12,33 @@ file in future prompts to keep the UI consistent.
 
 ## 1. Design Tokens
 
-All tokens live as CSS variables in `:root` (`src/styles.css`).
+All chrome colors live as CSS variables. The app supports **light** and **dark** themes plus **auto** (follows the OS). Preference is stored in `localStorage` under `budget_theme`, and applied to `<html data-theme="light|dark">` (`style.colorScheme` is also set so native controls follow suit). See `src/lib/theme.jsx` + the inline FOUC script in `index.html`.
+
+Always reach for `var(--…)` — never re-introduce raw chrome hex in JSX or new CSS rules; the only hardcoded hex that stay are the intentional status accents (income sky, positive/negative, card seeds — see §3).
 
 ### Colors (CSS variables)
-| Variable | Hex | Used for |
-|---|---|---|
-| `--bg` | `#f7f7f5` | App background (light gray) |
-| `--surface` | `#ffffff` | Inputs, modal, list rows, white panels, active tab pill |
-| `--block` | `#eeeeeb` | Cards / hero / chart cards / stat cards (gray blocks) |
-| `--hover` | `#e4e4df` | Row hover background |
-| `--border` | `#deded8` | All hairline borders |
-| `--text` | `#37352f` | Primary text (near-black) |
-| `--muted` | `#787774` | Secondary/caption/label text |
-| `--primary` | `#166534` | Primary actions, active tab, focus ring, links/ok |
-| `--primary-dark` | `#0f4d28` | Primary hover |
+| Variable | Light | Dark | Used for |
+|---|---|---|---|
+| `--bg` | `#f7f7f5` | `#191919` | App background |
+| `--surface` | `#ffffff` | `#2c2c2a` | Inputs, modal, list rows, active tab pill |
+| `--block` | `#eeeeeb` | `#262625` | Cards / hero / chart cards / stat cards |
+| `--hover` | `#e4e4df` | `#3a3a37` | Row hover background |
+| `--border` | `#deded8` | `#3d3d3a` | All hairline borders |
+| `--text` | `#37352f` | `#e8e7e3` | Primary text |
+| `--muted` | `#787774` | `#9b9a97` | Secondary / caption / label text |
+| `--primary` | `#166534` | `#22c55e` | Primary actions, active tab, focus ring, links/ok |
+| `--primary-dark` | `#0f4d28` | `#16a34a` | Primary hover |
+| `--on-primary` | `#ffffff` | `#0d1712` | Foreground on `--primary` |
+| `--danger` / `--danger-hover` | `#dc2626` / `#b91c1c` | `#f87171` / `#ef4444` | Destructive |
+| `--warning` | `#b45309` | `#f59e0b` | Warning text |
+| `--income` | `#0ea5e9` | `#38bdf8` | Income accent (reference; charts still fill `#0ea5e9` directly) |
+| `--frosted` / `--frosted-fade` | `rgba(247,247,245,0.82)` / same @ 0 | `rgba(25,25,25,0.82)` / same @ 0 | Header / tab-bar frosted glass |
+| `--overlay` | `rgba(15,15,15,0.4)` | `rgba(0,0,0,0.55)` | Modal overlay |
+| `--pending-bg` | `#fbfaf7` | `#242422` | Pending (未確定) row background |
+| `--badge-warn-bg` / `--badge-warn-border` / `--badge-warn-text` | `#fef3c7` / `#fde68a` / `#b45309` | `#3f2d10` / `#6b4a1a` / `#fbbf24` | 未確定 pill |
+| `--chart-grid` | `#e4e4df` | `#3d3d3a` | Recharts `CartesianGrid` stroke |
+| `--chart-axis` | `#787774` | `#9b9a97` | Recharts axis stroke + tick fill |
+| `--chip-fill-mix` | `white` | `#2c2c2a` | Base for `color-mix` chip/badge tints |
 
 ### Typography
 - **Font family:** `ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif`
@@ -47,6 +60,12 @@ Common: page section `gap: 6`; stat grid `gap: 8`; form `gap: 12`; card padding 
 
 ### Shadows
 - **None.** `--shadow: none`. The design is intentionally **flat** (Notion-style). Do not add box-shadows. Depth comes from `--border` hairlines and the `--block` vs `--surface` contrast.
+- The only "elevation" effect is the **frosted glass** header & tab bar: `background: var(--frosted)` + `backdrop-filter: saturate(180%) blur(12px)`.
+
+### Theme control
+- Settings has an **外観** card (directly above アカウント / ログアウト) with a segmented control: `ライト` / `ダーク` / `自動`.
+- `自動` follows `matchMedia('(prefers-color-scheme: dark)')` live — no reload required.
+- Reusable pattern: `.segmented` in `styles.css` — flat container, `--surface` background, per-button `--border` dividers, active state uses `--primary` + `--on-primary`.
 - The only "elevation" effect is the **frosted glass** header & tab bar: `background: rgba(247,247,245,0.82)` + `backdrop-filter: saturate(180%) blur(12px)`.
 
 ---
@@ -207,7 +226,8 @@ expense color, used for the aggregated "その他支出" stat.
 ## 7. Do's and Don'ts
 
 **Do**
-- Use **CSS variables** (`var(--…)`) for all chrome colors; use **`formatYen()`** for every money value.
+- Use **CSS variables** (`var(--…)`) for all chrome colors so light + dark themes both work; use **`formatYen()`** for every money value.
+- When adding native controls, let `<html style="color-scheme">` (set by the theme provider) handle native form widget colors — don't hardcode `background: white` on inputs.
 - Use **`#dc2626`** for destructive actions (delete), with `#b91c1c` hover; route deletes through a confirm Modal.
 - Use **`--primary` `#166534`** for primary actions, active states, focus, and success text.
 - Read card/type **names and colors from `useMeta()`** (data-driven); use a card's stored `color` for its chart series, dot, and stat accent.
@@ -218,6 +238,7 @@ expense color, used for the aggregated "その他支出" stat.
 
 **Don't**
 - **Don't add box-shadows** — `--shadow` is `none`; depth is borders + frosted glass only.
+- **Don't reintroduce raw chrome hex** (e.g. `#fff`, `#111`, `rgba(247,247,245,…)`) — add or extend a CSS variable in `:root` + `[data-theme="dark"]` instead.
 - **Don't hardcode card/expense colors** in components — they live in the `cards` / `other_expense_types` tables. The only allowed hardcoded expense color is `OTHER_COLOR` (`#6b7280`) for the aggregated その他.
 - **Don't introduce new raw hex** for chrome; add/extend a CSS variable instead. (Status colors `#0ea5e9`/`#16a34a`/`#dc2626`/`#b45309` and the pending-badge palette are the established exceptions.)
 - **Don't put English UI copy** in new screens — labels, buttons, messages are Japanese.

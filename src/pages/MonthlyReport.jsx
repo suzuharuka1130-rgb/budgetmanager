@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { fetchMonth, fetchAvailableYears } from '../lib/api'
-import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR } from '../lib/helpers'
+import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR, EXPENSE_TOTAL_COLOR } from '../lib/helpers'
 import { StatCard, Loading, ErrorMsg, EntryList } from '../components/Ui'
 import { useMeta } from '../lib/meta'
 
@@ -59,14 +59,16 @@ export default function MonthlyReport() {
 
   return (
     <div className="page">
-      <h2 className="page-title">月次レポート</h2>
-      <div className="selector-row">
-        <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
-        </select>
-        <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-          {MONTHS.map((m) => <option key={m} value={m}>{m}月</option>)}
-        </select>
+      <div className="page-header">
+        <h2 className="page-title">月次レポート</h2>
+        <div className="selector-row selector-row--chip">
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {years.map((y) => <option key={y} value={y}>{y}年</option>)}
+          </select>
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            {MONTHS.map((m) => <option key={m} value={m}>{m}月</option>)}
+          </select>
+        </div>
       </div>
 
       {loading ? <Loading /> : error ? <ErrorMsg error={error} /> : (
@@ -85,7 +87,16 @@ export default function MonthlyReport() {
           </motion.div>
 
           <motion.div variants={itemVariants}>
-            <h3 className="section-title">支出内訳</h3>
+            <h3 className="section-title">支出合計</h3>
+            <div className="stat-grid" style={{ marginBottom: '4px' }}>
+              <StatCard
+                label="支出合計"
+                value={formatYen(totalCards + totalOther)}
+                color={EXPENSE_TOTAL_COLOR}
+                accent
+              />
+            </div>
+            <h4 className="subsection-title">内訳</h4>
             <div className="stat-grid" style={{ marginBottom: '12px' }}>
               {cardBreakdown.map(({ card, total }) => (
                 <StatCard key={card.id} label={card.name} value={formatYen(total)} color={card.color} accent />

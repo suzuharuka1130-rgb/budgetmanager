@@ -4,14 +4,14 @@ import { cn } from '../../lib/cn'
 
 // shadcn 風の Button（cva バリアント + framer-motion のタップアニメーション）
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#166534]/40 disabled:opacity-50 disabled:pointer-events-none select-none',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)]/40 disabled:opacity-50 disabled:pointer-events-none select-none',
   {
     variants: {
       variant: {
-        default: 'bg-[#166534] text-white hover:bg-[#0f4d28]',
-        outline: 'border border-[#deded8] bg-white text-[#37352f] hover:bg-[#eeeeeb]',
-        danger: 'bg-[#dc2626] text-white hover:bg-[#b91c1c]',
-        ghost: 'text-[#37352f] hover:bg-[#eeeeeb]',
+        default: 'bg-[color:var(--primary)] text-[color:var(--on-primary)] hover:bg-[color:var(--primary-dark)]',
+        outline: 'border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text)] hover:bg-[color:var(--block)]',
+        danger: 'bg-[color:var(--danger)] text-white hover:bg-[color:var(--danger-hover)]',
+        ghost: 'text-[color:var(--text)] hover:bg-[color:var(--block)]',
       },
       size: {
         default: 'h-10 px-4 py-2',

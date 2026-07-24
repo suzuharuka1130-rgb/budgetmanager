@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { fetchMonth } from '../lib/api'
-import { currentYearMonth, formatYen, monthLabel, sumAmount, OTHER_COLOR } from '../lib/helpers'
+import { currentYearMonth, formatYen, monthLabel, sumAmount, OTHER_COLOR, EXPENSE_TOTAL_COLOR } from '../lib/helpers'
 import { StatCard, Loading, ErrorMsg, EntryList } from '../components/Ui'
 import Modal from '../components/Modal'
 import { IncomeForm, CardExpenseForm, OtherExpenseForm } from '../components/EntryForms'
@@ -65,13 +65,13 @@ export default function ThisMonth() {
     >
       <motion.div className="hero" variants={itemVariants}>
         <div className="hero-month">{monthLabel(year, month)}</div>
-        <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', marginTop: '6px' }}>
-          <div className="hero-remaining" style={{ marginTop: 0 }}>
-            <span>今月の残額</span>
+        <div className="hero-metrics">
+          <div className="hero-remaining">
+            <span>今月の収支</span>
             <strong style={{ color: remaining >= 0 ? '#16a34a' : '#dc2626' }}>{formatYen(remaining)}</strong>
           </div>
-          <div className="hero-remaining" style={{ marginTop: 0 }}>
-            <span>現在の口座残高</span>
+          <div className="hero-remaining">
+            <span>口座残高</span>
             <strong>
               {data.balance ? formatYen(data.balance.balance) : '未入力'}
             </strong>
@@ -92,7 +92,15 @@ export default function ThisMonth() {
       </motion.div>
 
       <motion.div variants={itemVariants}>
-        <h3 className="section-title">支出内訳</h3>
+        <h3 className="section-title">支出合計</h3>
+        <StatCard
+          label="今月の支出合計"
+          value={formatYen(totalCards + totalOther)}
+          color={EXPENSE_TOTAL_COLOR}
+          accent
+          layout="row"
+        />
+        <h4 className="subsection-title">内訳</h4>
         <div className="stat-grid">
           {cardBreakdown.map(({ card, total }) => (
             <StatCard key={card.id} label={card.name} value={formatYen(total)} color={card.color} accent />
