@@ -169,6 +169,12 @@ body {
 .page { display: flex; flex-direction: column; gap: 6px; }
 .page-title { font-size: 22px; font-weight: 700; margin: 6px 0 10px; letter-spacing: -0.01em; }
 .section-title { font-size: 14px; color: var(--text); margin: 18px 0 6px; font-weight: 600; }
+.subsection-title {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 10px 0 4px;
+  font-weight: 600;
+}
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
 
@@ -229,12 +235,29 @@ body {
   padding: 10px 14px;
 }
 .stat-label { font-size: 12px; color: var(--muted); }
-.stat-value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+.stat-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
 .stat-card.row-layout {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 4px 14px;
+}
+.stat-card.row-layout .stat-label { margin-bottom: 0; }
+.stat-card.row-layout .stat-value { margin-top: 0; }
+
+/* SP: 統計カードをすべて横並び（ラベル左・金額右）のフル幅に */
+@media (max-width: 599px) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+  .stat-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 14px;
+  }
+  .stat-card .stat-label { margin-bottom: 0; }
+  .stat-card .stat-value { margin-top: 0; }
 }
 
 /* セレクタ */

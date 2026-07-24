@@ -130,7 +130,16 @@ export default function YearlySummary() {
           </motion.div>
 
           <motion.div variants={itemVariants}>
-            <h3 className="section-title">支出内訳</h3>
+            <h3 className="section-title">支出合計</h3>
+            <div className="stat-grid" style={{ marginBottom: '4px' }}>
+              <StatCard
+                label="支出合計"
+                value={formatYen(totalCards + totalOther)}
+                color={OTHER_COLOR}
+                accent
+              />
+            </div>
+            <h4 className="subsection-title">内訳</h4>
             <div className="stat-grid">
               {relevantCards.map((c) => (
                 <StatCard key={c.id} label={c.name} value={formatYen(cardTotals[c.id] || 0)} color={c.color} accent />

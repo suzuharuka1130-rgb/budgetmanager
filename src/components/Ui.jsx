@@ -14,8 +14,8 @@ export function StatCard({ label, value, color, accent, layout }) {
   const isRow = layout === 'row'
   return (
     <div className={`stat-card ${isRow ? 'row-layout' : ''}`} style={accent ? { borderBottomColor: color } : undefined}>
-      <div className="stat-label" style={isRow ? { marginBottom: 0 } : undefined}>{label}</div>
-      <div className="stat-value" style={color ? { color, marginTop: isRow ? 0 : '6px' } : undefined}>{value}</div>
+      <div className="stat-label">{label}</div>
+      <div className="stat-value" style={color ? { color } : undefined}>{value}</div>
     </div>
   )
 }

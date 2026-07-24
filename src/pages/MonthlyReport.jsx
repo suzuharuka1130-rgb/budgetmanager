@@ -85,7 +85,16 @@ export default function MonthlyReport() {
           </motion.div>
 
           <motion.div variants={itemVariants}>
-            <h3 className="section-title">支出内訳</h3>
+            <h3 className="section-title">支出合計</h3>
+            <div className="stat-grid" style={{ marginBottom: '4px' }}>
+              <StatCard
+                label="支出合計"
+                value={formatYen(totalCards + totalOther)}
+                color={OTHER_COLOR}
+                accent
+              />
+            </div>
+            <h4 className="subsection-title">内訳</h4>
             <div className="stat-grid" style={{ marginBottom: '12px' }}>
               {cardBreakdown.map(({ card, total }) => (
                 <StatCard key={card.id} label={card.name} value={formatYen(total)} color={card.color} accent />
