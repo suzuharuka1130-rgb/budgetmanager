@@ -66,6 +66,7 @@ Common: page section `gap: 6`; stat grid `gap: 8`; form `gap: 12`; card padding 
 - Settings has an **外観** card (directly above アカウント / ログアウト) with a segmented control: `ライト` / `ダーク` / `自動`.
 - `自動` follows `matchMedia('(prefers-color-scheme: dark)')` live — no reload required.
 - Reusable pattern: `.segmented` in `styles.css` — flat container, `--surface` background, per-button `--border` dividers, active state uses `--primary` + `--on-primary`.
+- The only "elevation" effect is the **frosted glass** header & tab bar: `background: rgba(247,247,245,0.82)` + `backdrop-filter: saturate(180%) blur(12px)`.
 
 ---
 
