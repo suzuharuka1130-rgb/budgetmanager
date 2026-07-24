@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchYear, fetchAvailableYears } from '../lib/api'
-import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR } from '../lib/helpers'
+import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR, EXPENSE_TOTAL_COLOR } from '../lib/helpers'
 import { StatCard, Loading, ErrorMsg } from '../components/Ui'
 import { useMeta } from '../lib/meta'
 
@@ -208,7 +208,7 @@ export default function YearlySummary() {
               <StatCard
                 label="支出合計"
                 value={formatYen(totalCards + totalOther)}
-                color={OTHER_COLOR}
+                color={EXPENSE_TOTAL_COLOR}
                 accent
               />
             </div>

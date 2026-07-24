@@ -247,10 +247,38 @@ body {
   padding: 18px 20px;
 }
 .hero-month { font-size: 13px; color: var(--muted); }
-.hero-remaining { display: flex; flex-direction: column; margin-top: 6px; }
+.hero-metrics {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.hero-remaining { display: flex; flex-direction: column; margin-top: 0; min-width: 0; }
 .hero-remaining span { font-size: 13px; color: var(--muted); }
-.hero-remaining strong { font-size: 36px; line-height: 1.15; font-weight: 700; }
+.hero-remaining strong {
+  font-size: 36px;
+  line-height: 1.15;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .hero-sub { margin-top: 8px; font-size: 13px; color: var(--muted); }
+
+/* SP: 収支と口座残高を横並び（金額を縮めて収める） */
+@media (max-width: 599px) {
+  .hero-metrics {
+    flex-wrap: nowrap;
+    gap: 12px;
+  }
+  .hero-remaining {
+    flex: 1;
+    min-width: 0;
+  }
+  .hero-remaining strong {
+    font-size: 33px;
+  }
+}
 
 /* クイックアクション */
 .quick-actions { display: flex; gap: 6px; margin-top: 12px; flex-wrap: nowrap; }

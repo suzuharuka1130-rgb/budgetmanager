@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { fetchMonth, fetchAvailableYears } from '../lib/api'
-import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR } from '../lib/helpers'
+import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR, EXPENSE_TOTAL_COLOR } from '../lib/helpers'
 import { StatCard, Loading, ErrorMsg, EntryList } from '../components/Ui'
 import { useMeta } from '../lib/meta'
 
@@ -92,7 +92,7 @@ export default function MonthlyReport() {
               <StatCard
                 label="支出合計"
                 value={formatYen(totalCards + totalOther)}
-                color={OTHER_COLOR}
+                color={EXPENSE_TOTAL_COLOR}
                 accent
               />
             </div>

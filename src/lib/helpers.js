@@ -2,6 +2,7 @@
 // カード/その他支出タイプは cards / other_expense_types テーブルで動的管理（meta.jsx 参照）
 
 export const OTHER_COLOR = '#6b7280' // その他支出（集計）の色
+export const EXPENSE_TOTAL_COLOR = '#b45353' // 支出合計（くすんだ赤。その他のグレーと区別）
 
 export function formatYen(value) {
   const n = Number(value) || 0
