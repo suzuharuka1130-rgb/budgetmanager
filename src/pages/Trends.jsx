@@ -116,10 +116,10 @@ export default function Trends() {
             {showChart ? (
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={balanceSeries} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" fontSize={12} />
-                  <YAxis tickFormatter={yTick} fontSize={11} width={56} />
-                  <Tooltip formatter={(v) => formatYen(v)} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
+                  <XAxis dataKey="name" fontSize={12} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
+                  <YAxis tickFormatter={yTick} fontSize={11} width={56} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
+                  <Tooltip formatter={(v) => formatYen(v)} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} labelStyle={{ color: 'var(--text)' }} itemStyle={{ color: 'var(--text)' }} />
                   <Line type="monotone" dataKey="残高" stroke="#0ea5e9" strokeWidth={2} connectNulls dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -133,10 +133,10 @@ export default function Trends() {
             {showChart ? (
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={cardSeries} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" fontSize={12} />
-                  <YAxis tickFormatter={yTick} fontSize={11} width={56} />
-                  <Tooltip formatter={(v) => formatYen(v)} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
+                  <XAxis dataKey="name" fontSize={12} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
+                  <YAxis tickFormatter={yTick} fontSize={11} width={56} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
+                  <Tooltip formatter={(v) => formatYen(v)} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} labelStyle={{ color: 'var(--text)' }} itemStyle={{ color: 'var(--text)' }} />
                   <Legend />
                   {relevantCards.map((c) => (
                     <Line key={c.id} type="monotone" dataKey={`c_${c.id}`} name={c.name}

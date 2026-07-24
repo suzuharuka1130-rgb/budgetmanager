@@ -114,7 +114,7 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
                 </div>
                 {r.note && <span className="entry-note muted">{r.note}</span>}
               </div>
-              <span className="entry-amount" style={{ color: r.pending ? '#9b9a97' : (r.sign === '+' ? '#0ea5e9' : '#111') }}>
+              <span className="entry-amount" style={{ color: r.pending ? 'var(--muted)' : (r.sign === '+' ? '#0ea5e9' : 'var(--text)') }}>
                 {r.sign}{formatYen(r.amount)}
               </span>
               {onRefresh && r.pending && (

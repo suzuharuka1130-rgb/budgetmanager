@@ -104,10 +104,10 @@ export default function YearlySummary() {
             {showChart ? (
               <ResponsiveContainer width="100%" height={340}>
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" fontSize={12} interval={0} />
-                  <YAxis tickFormatter={(v) => '¥' + (v / 10000) + '万'} fontSize={11} width={56} />
-                  <Tooltip formatter={(v) => formatYen(v)} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
+                  <XAxis dataKey="name" fontSize={12} interval={0} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
+                  <YAxis tickFormatter={(v) => '¥' + (v / 10000) + '万'} fontSize={11} width={56} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
+                  <Tooltip formatter={(v) => formatYen(v)} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} labelStyle={{ color: 'var(--text)' }} itemStyle={{ color: 'var(--text)' }} />
                   <Legend />
                   <Bar dataKey="入金" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
                   {relevantCards.map((c) => (

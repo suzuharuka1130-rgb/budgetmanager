@@ -145,7 +145,7 @@ export default function App() {
   function renderHeader(title) {
     return (
       <header className="app-header">
-        <svg className="app-logo" viewBox="0 0 64 64" fill="none" stroke="#166534"
+        <svg className="app-logo" viewBox="0 0 64 64" fill="none" stroke="var(--primary)"
           strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           {/* coin stack */}
           <ellipse cx="22" cy="13" rx="9" ry="3.2" />
