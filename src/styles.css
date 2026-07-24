@@ -576,6 +576,7 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
   padding: 16px;
   margin-bottom: 12px;
 }
+.card > .section-title:first-child { margin-top: 0; }
 .card code { background: var(--block); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
 /* 通知設定トグル */
