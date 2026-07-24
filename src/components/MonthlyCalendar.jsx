@@ -42,6 +42,18 @@ export default function MonthlyCalendar({ year, month, transactions = [] }) {
 
   const weeks = useMemo(() => buildWeeks(year, month), [year, month])
 
+  // 当月に登場したカード/タイプの凡例（色 → 名前）
+  const legendItems = useMemo(() => {
+    const map = new Map()
+    for (const t of transactions) {
+      const key = t.kind + ':' + t.groupId
+      if (!map.has(key)) map.set(key, { key, ...groupInfo(t) })
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'ja'))
+    // groupInfo は meta 由来の cardName/cardColor 等に依存
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, cardName, cardColor, typeName, typeColor])
+
   function dateKey(day) {
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
   }
@@ -100,6 +112,17 @@ export default function MonthlyCalendar({ year, month, transactions = [] }) {
           )
         }))}
       </div>
+
+      {legendItems.length > 0 && (
+        <ul className="cal-legend" aria-label="カテゴリ凡例">
+          {legendItems.map((item) => (
+            <li key={item.key} className="cal-legend-item">
+              <span className="dot" style={{ background: item.color }} />
+              <span>{item.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Modal
         open={selectedDay !== null}

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchYear, fetchAvailableYears } from '../lib/api'
-import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR, EXPENSE_TOTAL_COLOR } from '../lib/helpers'
+import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR, EXPENSE_TOTAL_COLOR, shortCardName } from '../lib/helpers'
 import { StatCard, Loading, ErrorMsg } from '../components/Ui'
 import { useMeta } from '../lib/meta'
 
@@ -34,14 +34,6 @@ function useIsMobile(breakpoint = 600) {
     }
   }, [breakpoint])
   return isMobile
-}
-
-// 凡例用（SP）: 「STARTS（家賃・光熱費）」→「STARTS」、長い名前は maxLen 文字で省略
-function shortCardName(name, maxLen = 8) {
-  if (!name) return name
-  const stripped = name.replace(/[（(].*$/, '').trim() || name
-  if (stripped.length <= maxLen) return stripped
-  return stripped.slice(0, maxLen) + '…'
 }
 
 export default function YearlySummary() {
