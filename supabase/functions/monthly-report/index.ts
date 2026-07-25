@@ -2,7 +2,7 @@
 // cron: 全世帯をループし、各世帯のレポートを各世帯のメンバーのLINEへ送信。
 // test=true（設定画面）: 呼び出しユーザーの世帯のみ、本人に送信。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { sendLineFlexMessage, buildAppLinkFlexContents, listHouseholdIds, householdLineRecipients } from '../_shared/line.ts'
+import { sendLineFlexMessage, buildAppLinkFlexContents, listHouseholdIds, householdLineRecipients, SendResult } from '../_shared/line.ts'
 import { buildMonthlyReportMessage, getServiceClient } from '../_shared/report.ts'
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 
@@ -60,15 +60,31 @@ Deno.serve(async (req) => {
     // cron: 全世帯
     const hids = await listHouseholdIds(sb)
     let sent = 0
+    // 1世帯の失敗が他の世帯への送信を止めないよう、世帯ごとに独立して処理・記録する
+    const failures: { householdId: string; error: string }[] = []
     for (const hid of hids) {
-      const recips = await householdLineRecipients(sb, hid, 'monthly_report')
-      if (!recips.length) continue
-      const message = await buildMonthlyReportMessage(sb, hid)
-      const contents = buildAppLinkFlexContents(message, APP_URL)
-      await sendLineFlexMessage(message.split('\n')[0], contents, recips)
-      sent += 1
+      try {
+        const recips = await householdLineRecipients(sb, hid, 'monthly_report')
+        if (!recips.length) continue
+        const message = await buildMonthlyReportMessage(sb, hid)
+        const contents = buildAppLinkFlexContents(message, APP_URL)
+        const results: SendResult[] = await sendLineFlexMessage(message.split('\n')[0], contents, recips)
+        const failed = results.filter((r) => !r.ok)
+        if (failed.length) {
+          throw new Error(
+            `LINE push failed for ${failed.length}/${results.length} recipient(s): ` +
+              failed.map((f) => `${f.userId}(${f.status})`).join(', '),
+          )
+        }
+        sent += 1
+      } catch (e) {
+        failures.push({ householdId: hid, error: String((e as Error)?.message ?? e) })
+      }
     }
-    return jsonResponse({ success: true, households: hids.length, sent })
+    return jsonResponse(
+      { success: failures.length === 0, households: hids.length, sent, failures },
+      failures.length ? 500 : 200,
+    )
   } catch (e) {
     return jsonResponse({ error: String((e as Error)?.message ?? e) }, 500)
   }
