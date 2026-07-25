@@ -89,7 +89,8 @@ export async function getFilteredLineUserIds(
 
 // 全世帯のIDを返す（service role 前提）
 export async function listHouseholdIds(sb: { from: (t: string) => any }): Promise<string[]> {
-  const { data } = await sb.from('households').select('id')
+  const { data, error } = await sb.from('households').select('id')
+  if (error) throw error
   return (data ?? []).map((h: { id: string }) => h.id)
 }
 
@@ -99,16 +100,18 @@ export async function householdLineRecipients(
   householdId: string,
   preferenceKey: 'monthly_report' | 'monthly_reminder' | 'credit_input_reminder',
 ): Promise<string[]> {
-  const { data: members } = await sb
+  const { data: members, error: membersError } = await sb
     .from('household_members')
     .select('user_id, line_user_id')
     .eq('household_id', householdId)
+  if (membersError) throw membersError
   const withLine = (members ?? []).filter((m: { line_user_id?: string }) => !!m.line_user_id)
   if (!withLine.length) return []
-  const { data: prefs } = await sb
+  const { data: prefs, error: prefsError } = await sb
     .from('notification_preferences')
     .select('user_id, monthly_report, monthly_reminder, credit_input_reminder')
     .in('user_id', withLine.map((m: { user_id: string }) => m.user_id))
+  if (prefsError) throw prefsError
   const prefMap = new Map((prefs ?? []).map((p: { user_id: string }) => [p.user_id, p]))
   return withLine
     .filter((m: { user_id: string }) => {
@@ -124,17 +127,19 @@ export async function customNotificationRecipients(
   householdId: string,
   notificationId: string,
 ): Promise<string[]> {
-  const { data: members } = await sb
+  const { data: members, error: membersError } = await sb
     .from('household_members')
     .select('user_id, line_user_id')
     .eq('household_id', householdId)
+  if (membersError) throw membersError
   const withLine = (members ?? []).filter((m: { line_user_id?: string }) => !!m.line_user_id)
   if (!withLine.length) return []
-  const { data: prefs } = await sb
+  const { data: prefs, error: prefsError } = await sb
     .from('custom_notification_prefs')
     .select('user_id, enabled')
     .eq('notification_id', notificationId)
     .in('user_id', withLine.map((m: { user_id: string }) => m.user_id))
+  if (prefsError) throw prefsError
   const prefMap = new Map((prefs ?? []).map((p: { user_id: string; enabled: boolean }) => [p.user_id, p.enabled]))
   return withLine
     .filter((m: { user_id: string }) => prefMap.get(m.user_id) !== false)
