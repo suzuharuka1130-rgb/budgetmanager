@@ -1,5 +1,6 @@
 // LINE Messaging API（push）への送信を担う共有ヘルパー。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { getSecretKey } from './keys.ts'
 
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push'
 
@@ -28,11 +29,14 @@ export async function getFilteredLineUserIds(
   const defaultTargets = getConfiguredUserIds()
 
   const url = Deno.env.get('SUPABASE_URL')
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!url || !key) {
-    // サービスロールキーがない場合はフォールバック
+  let key: string
+  try {
+    key = getSecretKey()
+  } catch {
+    // シークレットキーがない場合はフォールバック
     return defaultTargets;
   }
+  if (!url) return defaultTargets;
 
   try {
     const supabase = createClient(url, key)

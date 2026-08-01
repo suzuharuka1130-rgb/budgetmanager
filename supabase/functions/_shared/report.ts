@@ -1,5 +1,6 @@
 // 月次レポートのデータ取得とメッセージ整形（Edge Function 用 / Deno）。
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
+import { getSecretKey } from './keys.ts'
 
 const DIVIDER = '━━━━━━━━━━━━━━'
 
@@ -19,9 +20,8 @@ function prevMonth(year: number, month: number): { year: number; month: number }
 
 export function getServiceClient(): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL')
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!url || !key) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定です。')
-  return createClient(url, key)
+  if (!url) throw new Error('SUPABASE_URL が未設定です。')
+  return createClient(url, getSecretKey())
 }
 
 // 世帯の app_settings から値を取得（無ければ null）

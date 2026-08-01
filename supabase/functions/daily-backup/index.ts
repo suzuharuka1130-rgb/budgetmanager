@@ -22,6 +22,7 @@
 //      supabase secrets set GOOGLE_OAUTH_REFRESH_TOKEN="1//0g..."
 //    - GOOGLE_DRIVE_FOLDER_ID は任意（未設定なら本人ドライブに KakeiboBackups を自動作成）。
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
+import { getSecretKey, getPublishableKey } from '../_shared/keys.ts'
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 
 const BACKUP_TABLES = [
@@ -41,9 +42,8 @@ const KEEP_FILES = 30
 
 function getServiceClient(): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL')
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!url || !key) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定です。')
-  return createClient(url, key)
+  if (!url) throw new Error('SUPABASE_URL が未設定です。')
+  return createClient(url, getSecretKey())
 }
 
 // JST の YYYY-MM-DD
@@ -163,7 +163,7 @@ async function callerHouseholdId(req: Request, sb: SupabaseClient): Promise<stri
   if (!auth) return null
   const anon = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    getPublishableKey(),
     { global: { headers: { Authorization: auth } } },
   )
   const { data, error } = await anon.auth.getUser()

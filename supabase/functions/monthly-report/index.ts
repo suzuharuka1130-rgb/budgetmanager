@@ -2,6 +2,7 @@
 // cron: 全世帯をループし、各世帯のレポートを各世帯のメンバーのLINEへ送信。
 // test=true（設定画面）: 呼び出しユーザーの世帯のみ、本人に送信。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { getPublishableKey } from '../_shared/keys.ts'
 import { sendLineFlexMessage, buildAppLinkFlexContents, listHouseholdIds, householdLineRecipients, SendResult } from '../_shared/line.ts'
 import { buildMonthlyReportMessage, getServiceClient } from '../_shared/report.ts'
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
@@ -18,7 +19,7 @@ async function callerInfo(
   if (!auth) return null
   const anon = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    getPublishableKey(),
     { global: { headers: { Authorization: auth } } },
   )
   const { data, error } = await anon.auth.getUser()
