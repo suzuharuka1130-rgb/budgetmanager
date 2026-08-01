@@ -5,6 +5,7 @@
 // 代わりにこの関数内で Authorization ヘッダーのJWTを検証し、
 // ログイン済みユーザーのみ送信を許可する。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { getPublishableKey } from '../_shared/keys.ts'
 import { sendLineMessage } from '../_shared/line.ts'
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 
@@ -13,7 +14,7 @@ async function isAuthenticated(req: Request): Promise<boolean> {
   if (!authHeader) return false
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    getPublishableKey(),
     { global: { headers: { Authorization: authHeader } } },
   )
   const { data, error } = await supabase.auth.getUser()

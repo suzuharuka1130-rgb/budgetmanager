@@ -52,7 +52,9 @@ Each user can enable/disable 月次レポート individually in **Settings → L
 reminders — households can create any number of notifications with their own message and a
 monthly send day (1–31 or 月末), edit or delete them at any time, and each member can opt in/out
 of each notification individually. A single `custom-reminder` function runs daily and sends only
-the notifications whose configured day matches today (JST).
+the notifications whose configured day matches today (JST). Each notification has its own
+テスト button in 通知管理 that sends it immediately to the requester's own LINE account,
+ignoring its configured send day.
 
 Test sends route to the requester's own LINE account based on login email.
 
@@ -181,10 +183,8 @@ Set secrets in Supabase (Settings → Edge Functions → Secrets):
 | Secret | Description |
 |---|---|
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API channel access token |
-| `LINE_USER_ID_ME` | Your LINE user ID |
-| `LINE_USER_ID_WIFE` | Partner's LINE user ID |
-| `USER_EMAIL_ME` | Your login email |
-| `USER_EMAIL_WIFE` | Partner's login email |
+| `LINE_USER_ID_ME` | Fallback recipient when `send-line-message` is called with no explicit `userIds` |
+| `LINE_USER_ID_WIFE` | Same fallback, second recipient (optional) |
 | `GEMINI_API_KEY` | Google Gemini API key (for receipt analysis) |
 | `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID for Drive backup |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret for Drive backup |
@@ -192,8 +192,16 @@ Set secrets in Supabase (Settings → Edge Functions → Secrets):
 | `GOOGLE_DRIVE_FOLDER_ID` | *(optional)* target folder ID; auto-created if unset |
 
 > The `daily-backup` function requires running `migrations/backup_logs.sql` first (creates the
-> `backup_logs` table and the `restore_household_data` RPC). For obtaining the Google OAuth
-> refresh token, see the setup comment at the top of `supabase/functions/daily-backup/index.ts`.
+> `backup_logs` table and the `restore_household_data` RPC). `monthly-report` and
+> `custom-reminder` require `migrations/notification_logs.sql` (records each run's outcome —
+> `cron.job_run_details` only shows whether the HTTP POST was sent, not whether the function
+> itself succeeded). For obtaining the Google OAuth refresh token, see the setup comment at the
+> top of `supabase/functions/daily-backup/index.ts`.
+>
+> `monthly-report`, `custom-reminder`, and `daily-backup` only run their cron (all-household)
+> path for requests whose `apikey` header matches the project's secret key — `cron.sql` already
+> sends this. Calling them without it (e.g. `test: true` from the app) requires a logged-in
+> user's session instead and only acts on that user's own household.
 
 ### 5. Cron jobs (optional)
 

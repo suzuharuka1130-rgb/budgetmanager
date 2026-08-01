@@ -88,6 +88,20 @@ export async function sendMonthlyReport() {
   return data
 }
 
+// custom-reminder Edge Function を呼び出し、指定したカスタム通知を自分宛にテスト送信する
+export async function sendCustomNotificationTest(notificationId) {
+  const c = getClient()
+  if (!c) throw new Error('Supabase の接続情報が設定されていません。')
+  const { data, error } = await c.functions.invoke('custom-reminder', {
+    body: { test: true, notificationId },
+  })
+  if (error) throw error
+  if (data && data.success === false) {
+    throw new Error('LINE送信に失敗しました（チャネルトークン/LINE連携をご確認ください）。')
+  }
+  return data
+}
+
 // daily-backup Edge Function を手動起動し、Google Drive へバックアップする
 export async function runDailyBackup() {
   const c = getClient()

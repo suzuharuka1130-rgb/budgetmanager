@@ -5,6 +5,7 @@
 // Body: { "image": "<base64>", "mimeType"?: "image/jpeg" | "image/png" }
 // ブラウザ（カード支出フォーム）から呼ばれるため CORS 対応 + JWT 手動検証。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { getPublishableKey } from '../_shared/keys.ts'
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 
 // 注: gemini-2.0-flash はこのアカウントの無料枠が limit:0 のため、
@@ -43,7 +44,7 @@ async function isAuthenticated(req: Request): Promise<boolean> {
   if (!authHeader) return false
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    getPublishableKey(),
     { global: { headers: { Authorization: authHeader } } },
   )
   const { data, error } = await supabase.auth.getUser()

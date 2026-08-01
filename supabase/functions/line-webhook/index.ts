@@ -1,6 +1,7 @@
 // LINE Webhook: メンバーがBotに連携コードを送信すると、その送信者のLINEユーザーIDを
 // 該当メンバーに自動保存する。LINE Developers の Webhook URL に設定すること。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { getSecretKey } from '../_shared/keys.ts'
 
 const LINE_REPLY_URL = 'https://api.line.me/v2/bot/message/reply'
 
@@ -39,7 +40,7 @@ Deno.serve(async (req) => {
 
   const sb = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    getSecretKey(),
   )
 
   for (const ev of payload.events ?? []) {

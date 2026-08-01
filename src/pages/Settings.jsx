@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { getCredentials, saveCredentials, signOut, hasEnvCredentials, sendMonthlyReport, getSession } from '../lib/supabase'
+import { getCredentials, saveCredentials, signOut, hasEnvCredentials, sendMonthlyReport, sendCustomNotificationTest, getSession } from '../lib/supabase'
 import {
   fetchNotificationPreferences, upsertNotificationPreferences, setAppSetting,
   addCard, updateCard, deactivateCard, setCardOrder,
   addOtherExpenseType, updateOtherExpenseType, deactivateOtherExpenseType, setOtherExpenseTypeOrder,
-  createInvite, createLineLinkCode, setMyLineUserId,
+  createInvite, createLineLinkCode, setMyLineUserId, fetchCustomNotifications,
 } from '../lib/api'
 import Modal from '../components/Modal'
 import { BalanceForm } from '../components/EntryForms'
 import MasterManager from '../components/MasterManager'
-import CustomNotificationManager from '../components/CustomNotificationManager'
+import CustomNotificationManager, { dayLabel, previewText } from '../components/CustomNotificationManager'
 import BackupRestore from '../components/BackupRestore'
 import { useMeta } from '../lib/meta'
 import { useHousehold } from '../lib/household'
@@ -34,9 +34,14 @@ export default function Settings({ onCredentialsChange }) {
   const [anonKey, setAnonKey] = useState(initial.anonKey)
   const [saved, setSaved] = useState(false)
   const [showBalance, setShowBalance] = useState(false)
-  const [lineSending, setLineSending] = useState(false)
-  const [lineResult, setLineResult] = useState(null) // { ok, text }
   const [userId, setUserId] = useState(null)
+
+  // LINE通知テスト送信（選択ピッカー）
+  const [testModalOpen, setTestModalOpen] = useState(false)
+  const [testItemsLoading, setTestItemsLoading] = useState(false)
+  const [testCustomItems, setTestCustomItems] = useState([])
+  const [testingId, setTestingId] = useState(null)
+  const [testResults, setTestResults] = useState({}) // { [itemId]: { ok, text } }
 
   // メンバー管理
   const [inviteCode, setInviteCode] = useState(null)
@@ -143,16 +148,33 @@ export default function Settings({ onCredentialsChange }) {
     setTimeout(() => setSaved(false), 2500)
   }
 
-  async function handleLineTest() {
-    setLineSending(true)
-    setLineResult(null)
+  async function openTestModal() {
+    setTestModalOpen(true)
+    setTestResults({})
+    setTestItemsLoading(true)
     try {
-      await sendMonthlyReport()
-      setLineResult({ ok: true, text: 'LINEに月次レポートを送信しました。' })
-    } catch (e) {
-      setLineResult({ ok: false, text: e.message || String(e) })
+      setTestCustomItems(await fetchCustomNotifications())
+    } catch {
+      setTestCustomItems([])
     } finally {
-      setLineSending(false)
+      setTestItemsLoading(false)
+    }
+  }
+
+  async function handleTestSend(item) {
+    setTestingId(item.id)
+    setTestResults((prev) => ({ ...prev, [item.id]: null }))
+    try {
+      if (item.kind === 'monthly') {
+        await sendMonthlyReport()
+      } else {
+        await sendCustomNotificationTest(item.id)
+      }
+      setTestResults((prev) => ({ ...prev, [item.id]: { ok: true, text: 'LINEに送信しました。' } }))
+    } catch (e) {
+      setTestResults((prev) => ({ ...prev, [item.id]: { ok: false, text: e.message || String(e) } }))
+    } finally {
+      setTestingId(null)
     }
   }
 
@@ -246,14 +268,11 @@ export default function Settings({ onCredentialsChange }) {
 
         <h4 className="section-title" style={{ marginTop: '20px' }}>LINE通知テスト送信</h4>
         <p className="muted small">
-          月次レポートを送信してプレビューできます。
+          登録済みの通知から選んで、自分宛にテスト送信できます。
         </p>
-        <button className="btn" disabled={!connected || lineSending} onClick={handleLineTest}>
-          {lineSending ? '送信中...' : 'LINE通知テスト送信'}
+        <button className="btn" disabled={!connected} onClick={openTestModal}>
+          LINE通知テスト送信
         </button>
-        {lineResult && (
-          <p className={lineResult.ok ? 'form-ok' : 'form-error'}>{lineResult.text}</p>
-        )}
       </motion.div>
 
       <motion.div variants={itemVariants}>
@@ -370,6 +389,43 @@ export default function Settings({ onCredentialsChange }) {
 
       <Modal open={showBalance} title="口座残高の入力" onClose={() => setShowBalance(false)}>
         <BalanceForm onSaved={() => setShowBalance(false)} />
+      </Modal>
+
+      <Modal open={testModalOpen} title="LINE通知テスト送信" onClose={() => !testingId && setTestModalOpen(false)}>
+        <p className="muted small" style={{ margin: '0 0 12px' }}>
+          送信したい通知を選んでください。自分のLINEアカウントにのみ届きます。
+        </p>
+        {testItemsLoading ? (
+          <p className="muted small">読み込み中...</p>
+        ) : (
+          <ul className="master-list">
+            {[{ id: 'monthly-report', kind: 'monthly', label: '月次レポート', day: '毎月1日' },
+              ...testCustomItems.map((n) => ({ id: n.id, kind: 'custom', label: previewText(n.content), day: dayLabel(n.day_of_month) })),
+            ].map((item) => (
+              <li key={item.id} className="master-row" style={{ flexWrap: 'wrap' }}>
+                <span className="master-name">
+                  {item.label}
+                  <span className="master-group">{item.day}</span>
+                </span>
+                <button
+                  className="icon-btn sm"
+                  onClick={() => handleTestSend(item)}
+                  disabled={testingId === item.id}
+                >
+                  {testingId === item.id ? '...' : '送信'}
+                </button>
+                {testResults[item.id] && (
+                  <p
+                    className={testResults[item.id].ok ? 'form-ok' : 'form-error'}
+                    style={{ width: '100%', margin: '4px 0 0' }}
+                  >
+                    {testResults[item.id].text}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </Modal>
     </motion.div>
   )
