@@ -12,12 +12,13 @@ const DAY_OPTIONS = [
   ...Array.from({ length: 31 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}日` })),
   { value: 'last', label: '月末' },
 ]
-const dayLabel = (d) => (d === 'last' ? '月末' : `毎月${d}日`)
+export const dayLabel = (d) => (d === 'last' ? '月末' : `毎月${d}日`)
 // 一覧表示用に先頭の絵文字を取り除く（保存されている本文自体は変更しない）
-const previewText = (content) => content.split('\n')[0].replace(/^[\p{Extended_Pictographic}️\s]+/u, '')
+export const previewText = (content) => content.split('\n')[0].replace(/^[\p{Extended_Pictographic}️\s]+/u, '')
 
 // カスタム通知の管理UI（追加・編集・削除・自分への通知ON/OFF）
 // 通知は世帯単位、ON/OFF はメンバー単位（行なし = ON）。
+// テスト送信は Settings の「LINE通知テスト送信」から一元的に行う（sendCustomNotificationTest）。
 export default function CustomNotificationManager({ userId, connected }) {
   const [items, setItems] = useState([])
   const [prefs, setPrefs] = useState({}) // { notification_id: enabled }

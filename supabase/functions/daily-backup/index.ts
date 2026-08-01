@@ -22,7 +22,8 @@
 //      supabase secrets set GOOGLE_OAUTH_REFRESH_TOKEN="1//0g..."
 //    - GOOGLE_DRIVE_FOLDER_ID は任意（未設定なら本人ドライブに KakeiboBackups を自動作成）。
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import { getSecretKey, getPublishableKey } from '../_shared/keys.ts'
+import { getSecretKey } from '../_shared/keys.ts'
+import { getCallerContext, isCronAuthorized } from '../_shared/auth.ts'
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 
 const BACKUP_TABLES = [
@@ -157,21 +158,6 @@ async function pruneOldBackups(token: string, folderId: string): Promise<void> {
   }
 }
 
-// 呼び出しユーザーの世帯ID（手動実行のログ記録先）
-async function callerHouseholdId(req: Request, sb: SupabaseClient): Promise<string | null> {
-  const auth = req.headers.get('Authorization') ?? ''
-  if (!auth) return null
-  const anon = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    getPublishableKey(),
-    { global: { headers: { Authorization: auth } } },
-  )
-  const { data, error } = await anon.auth.getUser()
-  if (error || !data?.user) return null
-  const { data: mem } = await sb.from('household_members').select('household_id').eq('user_id', data.user.id).limit(1)
-  return mem?.[0]?.household_id ?? null
-}
-
 async function logBackup(
   sb: SupabaseClient,
   hids: string[],
@@ -189,18 +175,22 @@ Deno.serve(async (req) => {
 
   const sb = getServiceClient()
 
-  // ログ記録先の世帯を決定（手動: 呼び出しユーザーの世帯 / cron: 全世帯）
+  // ログ記録先の世帯を決定（手動: 呼び出しユーザーの世帯 / cron: 全世帯）。
+  // どちらでもない（ユーザーJWTも secret キーの apikey も無い）リクエストは拒否する
+  // ——そうしないと URL さえ知っていれば誰でも全世帯分のバックアップを起動できてしまう。
   let logHids: string[] = []
   try {
-    const caller = await callerHouseholdId(req, sb)
+    const caller = await getCallerContext(req, sb)
     if (caller) {
-      logHids = [caller]
-    } else {
+      logHids = [caller.householdId]
+    } else if (isCronAuthorized(req)) {
       const { data: hs } = await sb.from('households').select('id')
       logHids = (hs ?? []).map((h: { id: string }) => h.id)
+    } else {
+      return jsonResponse({ error: '認証が必要です。' }, 401)
     }
-  } catch {
-    logHids = []
+  } catch (e) {
+    return jsonResponse({ error: String((e as Error)?.message ?? e) }, 500)
   }
 
   const filename = `${FILE_PREFIX}${backupDateJST()}.json`

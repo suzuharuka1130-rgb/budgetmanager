@@ -1,7 +1,4 @@
 // LINE Messaging API（push）への送信を担う共有ヘルパー。
-import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { getSecretKey } from './keys.ts'
-
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push'
 
 export interface SendResult {
@@ -11,84 +8,12 @@ export interface SendResult {
   error?: string
 }
 
-// 環境変数から送信先ユーザーIDを取得（ME は必須、WIFE は任意）
+// 環境変数から送信先ユーザーIDを取得（ME は必須、WIFE は任意）。
+// sendLineMessage/sendLineFlexMessage に userIds を渡さなかった場合のフォールバック。
 export function getConfiguredUserIds(): string[] {
   const me = Deno.env.get('LINE_USER_ID_ME')?.trim()
   const wife = Deno.env.get('LINE_USER_ID_WIFE')?.trim()
   return [me, wife].filter((id): id is string => !!id)
-}
-
-/**
- * ユーザーの通知設定に基づいて、送信対象の LINE ユーザーID をフィルタリングして返す。
- */
-export async function getFilteredLineUserIds(
-  preferenceKey: 'monthly_report' | 'monthly_reminder' | 'credit_input_reminder',
-): Promise<string[]> {
-  const me = Deno.env.get('LINE_USER_ID_ME')?.trim()
-  const wife = Deno.env.get('LINE_USER_ID_WIFE')?.trim()
-  const defaultTargets = getConfiguredUserIds()
-
-  const url = Deno.env.get('SUPABASE_URL')
-  let key: string
-  try {
-    key = getSecretKey()
-  } catch {
-    // シークレットキーがない場合はフォールバック
-    return defaultTargets;
-  }
-  if (!url) return defaultTargets;
-
-  try {
-    const supabase = createClient(url, key)
-    const { data: authData, error: authError } = await supabase.auth.admin.listUsers()
-    if (authError || !authData?.users) {
-      return defaultTargets;
-    }
-
-    const meEmail = (Deno.env.get('USER_EMAIL_ME') || 'suzu.haruka1130@gmail.com').trim().toLowerCase()
-    const wifeEmail = (Deno.env.get('USER_EMAIL_WIFE') || '').trim().toLowerCase()
-
-    const meUser = authData.users.find(u => u.email?.toLowerCase() === meEmail)
-    const wifeUser = authData.users.find(u => u.email?.toLowerCase() === wifeEmail)
-
-    const userIdsToFetch = [meUser?.id, wifeUser?.id].filter(Boolean) as string[]
-    if (!userIdsToFetch.length) {
-      return defaultTargets;
-    }
-
-    const { data: prefs, error: prefsError } = await supabase
-      .from('notification_preferences')
-      .select('*')
-      .in('user_id', userIdsToFetch)
-
-    if (prefsError) {
-      return defaultTargets;
-    }
-
-    const targets: string[] = []
-
-    // 自分 (ME) の判定
-    if (me) {
-      const mePref = prefs?.find(p => p.user_id === meUser?.id)
-      const isMeEnabled = mePref ? mePref[preferenceKey] : true
-      if (isMeEnabled) {
-        targets.push(me)
-      }
-    }
-
-    // 妻 (WIFE) の判定
-    if (wife) {
-      const wifePref = prefs?.find(p => p.user_id === wifeUser?.id)
-      const isWifeEnabled = wifePref ? wifePref[preferenceKey] : true
-      if (isWifeEnabled) {
-        targets.push(wife)
-      }
-    }
-
-    return targets
-  } catch {
-    return defaultTargets;
-  }
 }
 
 // 全世帯のIDを返す（service role 前提）
