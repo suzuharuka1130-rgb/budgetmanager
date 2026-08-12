@@ -3,6 +3,7 @@ import { currentYearMonth, toMonthValue, fromMonthValue } from '../lib/helpers'
 import { addIncome, addCardExpense, addCardExpenseTransactions, addOtherExpense, addOtherExpenseTransactions, setAccountBalance, uploadReceipt } from '../lib/api'
 import { analyzeReceipt } from '../lib/supabase'
 import { useMeta } from '../lib/meta'
+import { useDraftState, useSaveDraft, sanitizeMonthVal } from '../lib/useDraft'
 import { TrashIcon } from './icons'
 
 // 個別取引リストの合計金額（円）
@@ -79,9 +80,15 @@ function downscaleImageToBase64(file, maxDim = 1600, quality = 0.85) {
 
 const MAX_RECEIPT_BYTES = 10 * 1024 * 1024 // 10MB
 
-function useMonthState() {
+function useMonthState(initial) {
   const cur = currentYearMonth()
-  return useState(toMonthValue(cur.year, cur.month))
+  return useState(initial ?? toMonthValue(cur.year, cur.month))
+}
+
+const DRAFT_KEYS = {
+  income: 'kakeibo:draft:income',
+  card: 'kakeibo:draft:card',
+  other: 'kakeibo:draft:other',
 }
 
 function FormShell({ onSubmit, submitting, error, children }) {
@@ -142,10 +149,10 @@ function NoteField({ value, onChange }) {
 // txns が空のまま保存すれば従来どおり単一の合計のみの入力として保存される。
 // deferredBilling: true の場合（カード支出）、対象月を変更した際に取引日を「差分ヶ月」シフトする
 // （複数月にまたがる取引の相対関係を保つ）。false（その他支出）なら従来どおり対象月に統一する。
-function useTransactionEditor(monthVal, { deferredBilling = false, startWithBlankRow = false } = {}) {
-  const [txns, setTxns] = useState(startWithBlankRow ? [{ name: '', amount: '', date: '' }] : []) // [{ name, amount(string), date }]
-  const [amount, setAmountState] = useState('')
-  const [amountManual, setAmountManual] = useState(false) // 金額を手入力したら true（自動合計を止める）
+function useTransactionEditor(monthVal, { deferredBilling = false, startWithBlankRow = false, initial } = {}) {
+  const [txns, setTxns] = useState(initial?.txns ?? (startWithBlankRow ? [{ name: '', amount: '', date: '' }] : [])) // [{ name, amount(string), date }]
+  const [amount, setAmountState] = useState(initial?.amount ?? '')
+  const [amountManual, setAmountManual] = useState(initial?.amountManual ?? false) // 金額を手入力したら true（自動合計を止める）
   const prevMonthValRef = useRef(monthVal)
 
   // 金額フィールドの手入力（AmountField.onChange はユーザー操作でのみ発火）
@@ -273,11 +280,14 @@ function AmountAndTransactions({ editor, namePlaceholder, amountLabel, showAmoun
 }
 
 export function IncomeForm({ onSaved }) {
-  const [monthVal, setMonthVal] = useMonthState()
-  const [amount, setAmount] = useState('')
-  const [note, setNote] = useState('')
+  const draft = useDraftState(DRAFT_KEYS.income, null)
+  const [monthVal, setMonthVal] = useMonthState(sanitizeMonthVal(draft?.monthVal))
+  const [amount, setAmount] = useState(draft?.amount ?? '')
+  const [note, setNote] = useState(draft?.note ?? '')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const clearDraft = useSaveDraft(DRAFT_KEYS.income, { monthVal, amount, note })
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -288,6 +298,7 @@ export function IncomeForm({ onSaved }) {
     try {
       const { year, month } = fromMonthValue(monthVal)
       await addIncome({ year, month, amount: Number(amount), note: note || null })
+      clearDraft()
       onSaved()
     } catch (e2) {
       setError(e2.message || '保存に失敗しました。')
@@ -307,17 +318,27 @@ export function IncomeForm({ onSaved }) {
 
 export function CardExpenseForm({ onSaved }) {
   const { activeCards } = useMeta()
-  const [monthVal, setMonthVal] = useMonthState()
-  const [cardId, setCardId] = useState('')
-  const editor = useTransactionEditor(monthVal, { deferredBilling: true })
-  const [note, setNote] = useState('')
+  const draft = useDraftState(DRAFT_KEYS.card, null)
+  const [monthVal, setMonthVal] = useMonthState(sanitizeMonthVal(draft?.monthVal))
+  const [cardId, setCardId] = useState(draft?.cardId ?? '')
+  const editor = useTransactionEditor(monthVal, {
+    deferredBilling: true,
+    initial: draft ? { txns: draft.txns, amount: draft.amount, amountManual: draft.amountManual } : undefined,
+  })
+  const [note, setNote] = useState(draft?.note ?? '')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  // レシート画像は容量の都合上ドラフトに含めない（再度添付が必要）
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [aiFilled, setAiFilled] = useState(false)
   const [warning, setWarning] = useState(null)
+
+  const clearDraft = useSaveDraft(DRAFT_KEYS.card, {
+    monthVal, cardId, note,
+    txns: editor.txns, amount: editor.amount, amountManual: editor.amountManual,
+  })
 
   // カード一覧読み込み後、未選択なら先頭を選択
   useEffect(() => {
@@ -391,6 +412,7 @@ export function CardExpenseForm({ onSaved }) {
           setWarning('取引明細の保存に一部失敗しました。合計は保存されました。')
         }
       }
+      clearDraft()
       onSaved()
     } catch (e2) {
       setError(e2.message || '保存に失敗しました。')
@@ -444,13 +466,22 @@ export function CardExpenseForm({ onSaved }) {
 
 export function OtherExpenseForm({ onSaved }) {
   const { activeOtherTypes } = useMeta()
-  const [monthVal, setMonthVal] = useMonthState()
-  const [typeId, setTypeId] = useState('')
-  const editor = useTransactionEditor(monthVal, { startWithBlankRow: true })
-  const [note, setNote] = useState('')
+  const draft = useDraftState(DRAFT_KEYS.other, null)
+  const [monthVal, setMonthVal] = useMonthState(sanitizeMonthVal(draft?.monthVal))
+  const [typeId, setTypeId] = useState(draft?.typeId ?? '')
+  const editor = useTransactionEditor(monthVal, {
+    startWithBlankRow: true,
+    initial: draft ? { txns: draft.txns, amount: draft.amount, amountManual: draft.amountManual } : undefined,
+  })
+  const [note, setNote] = useState(draft?.note ?? '')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [warning, setWarning] = useState(null)
+
+  const clearDraft = useSaveDraft(DRAFT_KEYS.other, {
+    monthVal, typeId, note,
+    txns: editor.txns, amount: editor.amount, amountManual: editor.amountManual,
+  })
 
   useEffect(() => {
     if (!typeId && activeOtherTypes.length) setTypeId(activeOtherTypes[0].id)
@@ -476,6 +507,7 @@ export function OtherExpenseForm({ onSaved }) {
           setWarning('取引明細の保存に一部失敗しました。合計は保存されました。')
         }
       }
+      clearDraft()
       onSaved()
     } catch (e2) {
       setError(e2.message || '保存に失敗しました。')

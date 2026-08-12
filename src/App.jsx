@@ -120,7 +120,17 @@ export default function App() {
       .then((s) => setSession(s))
       .catch(() => setSession(null))
       .finally(() => setAuthChecked(true))
-    const unsubscribe = onAuthChange((s) => setSession(s))
+    // タブ復帰時の TOKEN_REFRESHED 等、同一ユーザーでの再通知では session の参照を
+    // 変えない（=世帯・マスタの再読み込みや画面の作り直しを起こさない）。
+    // 明示的な SIGNED_OUT / INITIAL_SESSION 以外での null セッションも無視する
+    // （復帰直後の一時的なセッション欠落でログイン画面に飛ばされるのを防ぐ）。
+    const unsubscribe = onAuthChange((s, event) => {
+      setSession((prev) => {
+        if (!s && event !== 'SIGNED_OUT' && event !== 'INITIAL_SESSION') return prev
+        if (event === 'TOKEN_REFRESHED' && prev?.user?.id && prev.user.id === s?.user?.id) return prev
+        return s
+      })
+    })
     return unsubscribe
   }, [connected])
 
@@ -184,8 +194,9 @@ export default function App() {
     )
   }
 
-  // 世帯の確認中
-  if (household.loading || household.householdId === undefined) {
+  // 世帯の確認中（初回のみ全画面ローディングにする。バックグラウンドの再読み込みで
+  // 既にマウント済みの画面を消さないよう household.loading 単体では判定しない）
+  if (household.householdId === undefined) {
     return (
       <div className="app">
         {renderHeader('Kakeibo')}
