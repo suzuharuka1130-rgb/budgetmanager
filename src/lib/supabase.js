@@ -131,9 +131,11 @@ export async function analyzeReceipt(base64Image, mimeType) {
 }
 
 // ログイン状態の変化を購読。解除用の関数を返す。
+// callback は (session, event) で呼ばれる。event はタブ復帰時の TOKEN_REFRESHED 等の
+// 判別に使う（呼び出し側で不要な再読み込みを避けるため）。
 export function onAuthChange(callback) {
   const c = getClient()
   if (!c) return () => {}
-  const { data } = c.auth.onAuthStateChange((_event, session) => callback(session))
+  const { data } = c.auth.onAuthStateChange((event, session) => callback(session, event))
   return () => data.subscription.unsubscribe()
 }
