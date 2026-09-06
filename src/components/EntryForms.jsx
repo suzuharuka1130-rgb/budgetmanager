@@ -11,6 +11,28 @@ function sumTxns(list) {
   return (list || []).reduce((s, t) => s + (Number(t.amount) || 0), 0)
 }
 
+// 取引日（新しい順）でソートする。日付未入力の行は末尾に残す。同日・未入力同士は元の順序を保つ。
+function sortTxnsByDateDesc(list) {
+  return [...(list || [])].sort((a, b) => {
+    if (!a.date && !b.date) return 0
+    if (!a.date) return 1
+    if (!b.date) return -1
+    return a.date < b.date ? 1 : a.date > b.date ? -1 : 0
+  })
+}
+
+let txnIdSeq = 0
+// 行の並び替え後もReactが同じ入力欄を正しく紐付けられるよう、取引行ごとに安定したidを振る。
+function makeTxnId() {
+  txnIdSeq += 1
+  return `txn-${Date.now()}-${txnIdSeq}`
+}
+
+// 取引行配列に（無ければ）idを補完する。下書き復元やOCR抽出結果はidを持たないため。
+function withTxnIds(list) {
+  return (list || []).map((t) => (t.id ? t : { ...t, id: makeTxnId() }))
+}
+
 // year/month に対して delta ヶ月ぶんずらした {year, month} を返す
 function addMonths(year, month, delta) {
   const total = year * 12 + (month - 1) + delta
@@ -150,7 +172,7 @@ function NoteField({ value, onChange }) {
 // deferredBilling: true の場合（カード支出）、対象月を変更した際に取引日を「差分ヶ月」シフトする
 // （複数月にまたがる取引の相対関係を保つ）。false（その他支出）なら従来どおり対象月に統一する。
 function useTransactionEditor(monthVal, { deferredBilling = false, startWithBlankRow = false, initial } = {}) {
-  const [txns, setTxns] = useState(initial?.txns ?? (startWithBlankRow ? [{ name: '', amount: '', date: '' }] : [])) // [{ name, amount(string), date }]
+  const [txns, setTxns] = useState(() => withTxnIds(initial?.txns ?? (startWithBlankRow ? [{ name: '', amount: '', date: '' }] : []))) // [{ id, name, amount(string), date }]
   const [amount, setAmountState] = useState(initial?.amount ?? '')
   const [amountManual, setAmountManual] = useState(initial?.amountManual ?? false) // 金額を手入力したら true（自動合計を止める）
   const prevMonthValRef = useRef(monthVal)
@@ -160,16 +182,17 @@ function useTransactionEditor(monthVal, { deferredBilling = false, startWithBlan
     setAmountManual(true)
     setAmountState(v)
   }
-  // 取引リスト変更時、手入力でなければ金額を合計に同期する
+  // 取引リスト変更時、手入力でなければ金額を合計に同期する。並び順は常に取引日の新しい順を保つ。
   function applyTxns(next) {
-    setTxns(next)
-    if (!amountManual) setAmountState(sumTxns(next) ? String(sumTxns(next)) : '')
+    const sorted = sortTxnsByDateDesc(next)
+    setTxns(sorted)
+    if (!amountManual) setAmountState(sumTxns(sorted) ? String(sumTxns(sorted)) : '')
   }
   function updateTxn(i, patch) {
     applyTxns(txns.map((t, idx) => (idx === i ? { ...t, ...patch } : t)))
   }
   function addTxn() {
-    setTxns((prev) => [...prev, { name: '', amount: '', date: '' }])
+    setTxns((prev) => sortTxnsByDateDesc([...prev, { id: makeTxnId(), name: '', amount: '', date: '' }]))
   }
   function removeTxn(i) {
     applyTxns(txns.filter((_, idx) => idx !== i))
@@ -185,7 +208,7 @@ function useTransactionEditor(monthVal, { deferredBilling = false, startWithBlan
   }
   // OCR等の抽出結果で取引リスト・金額をまとめて置き換える
   function fillFromExtraction(list, total) {
-    setTxns(list)
+    setTxns(sortTxnsByDateDesc(withTxnIds(list)))
     setAmountManual(false)
     setAmountState(total ? String(Math.round(total)) : '')
   }
@@ -200,12 +223,12 @@ function useTransactionEditor(monthVal, { deferredBilling = false, startWithBlan
       const a = fromMonthValue(monthVal)
       const b = fromMonthValue(prevMonthVal)
       const delta = (a.year - b.year) * 12 + (a.month - b.month)
-      setTxns((prev) => prev.map((t) => (t.date ? { ...t, date: shiftDateByMonths(t.date, delta) } : t)))
+      setTxns((prev) => sortTxnsByDateDesc(prev.map((t) => (t.date ? { ...t, date: shiftDateByMonths(t.date, delta) } : t))))
     } else {
       // 従来の挙動: 取引日の「日にち」部分は保ったまま年・月を対象月に統一する
       const { year, month } = fromMonthValue(monthVal)
       const ym = `${year}-${String(month).padStart(2, '0')}`
-      setTxns((prev) => prev.map((t) => (t.date ? { ...t, date: `${ym}-${t.date.slice(-2)}` } : t)))
+      setTxns((prev) => sortTxnsByDateDesc(prev.map((t) => (t.date ? { ...t, date: `${ym}-${t.date.slice(-2)}` } : t))))
     }
   }, [monthVal, deferredBilling])
 
@@ -219,7 +242,7 @@ function TransactionEditor({ txns, updateTxn, addTxn, removeTxn, namePlaceholder
       <span>{label}</span>
       <div className="txn-editor">
         {txns.map((t, i) => (
-          <div key={i} className="txn-row">
+          <div key={t.id ?? i} className="txn-row">
             <input
               type="text"
               className="txn-name"

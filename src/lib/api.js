@@ -22,28 +22,42 @@ export async function fetchMonth(year, month) {
 
   const balance = await computeBalanceAt(c, year, month, allBalances.data || [])
 
-  // 各明細に個別取引があるか（行クリックの判定用）。単一列の軽量クエリ。
+  // 各明細に個別取引があるか（行クリックの判定用）と、並び替え用の代表日（最新のtxn_date）を取得する。
   const cardRows = cards.data || []
   const otherRows = others.data || []
-  const [cardTxnIds, otherTxnIds] = await Promise.all([
-    fetchTxnParentIds(c, 'card_expense_transactions', 'card_expense_id', cardRows.map((r) => r.id)),
-    fetchTxnParentIds(c, 'other_expense_transactions', 'other_expense_id', otherRows.map((r) => r.id)),
+  const [cardTxnInfo, otherTxnInfo] = await Promise.all([
+    fetchTxnDateInfo(c, 'card_expense_transactions', 'card_expense_id', cardRows.map((r) => r.id)),
+    fetchTxnDateInfo(c, 'other_expense_transactions', 'other_expense_id', otherRows.map((r) => r.id)),
   ])
 
   return {
     income: income.data || [],
-    cards: cardRows.map((r) => ({ ...r, has_transactions: cardTxnIds.has(r.id) })),
-    others: otherRows.map((r) => ({ ...r, has_transactions: otherTxnIds.has(r.id) })),
+    cards: cardRows.map((r) => {
+      const info = cardTxnInfo.get(r.id)
+      return { ...r, has_transactions: !!info, entry_date: info?.maxDate || r.created_at }
+    }),
+    others: otherRows.map((r) => {
+      const info = otherTxnInfo.get(r.id)
+      return { ...r, has_transactions: !!info, entry_date: info?.maxDate || r.created_at }
+    }),
     balance,
   }
 }
 
-// 指定テーブルで、渡した親IDのうち個別取引が存在するものの集合を返す。
-async function fetchTxnParentIds(c, table, parentCol, parentIds) {
-  if (!parentIds.length) return new Set()
-  const { data, error } = await c.from(table).select(parentCol).in(parentCol, parentIds)
+// 指定テーブルで、渡した親IDごとに「個別取引の有無」と「取引日の最新値（txn_date基準）」を返す。
+// 取引日が未設定（null）の行しか無い場合は maxDate は null のまま（呼び出し側で created_at にフォールバック）。
+async function fetchTxnDateInfo(c, table, parentCol, parentIds) {
+  const map = new Map()
+  if (!parentIds.length) return map
+  const { data, error } = await c.from(table).select(`${parentCol}, txn_date`).in(parentCol, parentIds)
   if (error) throw error
-  return new Set((data || []).map((row) => row[parentCol]))
+  for (const row of data || []) {
+    const pid = row[parentCol]
+    const entry = map.get(pid) || { maxDate: null }
+    if (row.txn_date && (!entry.maxDate || row.txn_date > entry.maxDate)) entry.maxDate = row.txn_date
+    map.set(pid, entry)
+  }
+  return map
 }
 
 // 選択月の個別取引（カード＋その他、txn_date基準）を日別カレンダー用に取得する。
