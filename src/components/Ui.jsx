@@ -40,10 +40,13 @@ export function EntryList({ income = [], cards = [], others = [], onRefresh }) {
 
   const pending = (r) => r.confirmed === false
   const rows = [
-    ...income.map((r) => ({ id: 'i' + r.id, dbId: r.id, table: 'income', kind: '入金', label: '入金', amount: r.amount, note: r.note, color: '#0ea5e9', sign: '+', pending: pending(r) })),
-    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: cardName(r.card_id), amount: r.amount, note: r.note, color: cardColor(r.card_id), sign: '-', pending: pending(r), receiptPath: r.receipt_image_url, expenseId: r.id, txnKind: 'card', detailable: !!r.has_transactions || !!r.receipt_image_url })),
-    ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: typeName(r.expense_type_id), amount: r.amount, note: r.note, color: typeColor(r.expense_type_id), sign: '-', pending: pending(r), expenseId: r.id, txnKind: 'other', detailable: !!r.has_transactions })),
-  ]
+    ...income.map((r) => ({ id: 'i' + r.id, dbId: r.id, table: 'income', kind: '入金', label: '入金', amount: r.amount, note: r.note, color: '#0ea5e9', sign: '+', pending: pending(r), sortDate: r.created_at, tieBreakDate: r.created_at })),
+    ...cards.map((r) => ({ id: 'c' + r.id, dbId: r.id, table: 'cards', kind: 'カード支出', label: cardName(r.card_id), amount: r.amount, note: r.note, color: cardColor(r.card_id), sign: '-', pending: pending(r), receiptPath: r.receipt_image_url, expenseId: r.id, txnKind: 'card', detailable: !!r.has_transactions || !!r.receipt_image_url, sortDate: r.entry_date, tieBreakDate: r.created_at })),
+    ...others.map((r) => ({ id: 'o' + r.id, dbId: r.id, table: 'others', kind: 'その他支出', label: typeName(r.expense_type_id), amount: r.amount, note: r.note, color: typeColor(r.expense_type_id), sign: '-', pending: pending(r), expenseId: r.id, txnKind: 'other', detailable: !!r.has_transactions, sortDate: r.entry_date, tieBreakDate: r.created_at })),
+  ].sort((a, b) => {
+    const diff = new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime()
+    return diff !== 0 ? diff : new Date(b.tieBreakDate).getTime() - new Date(a.tieBreakDate).getTime()
+  })
 
   async function performConfirm(r) {
     setConfirmingId(r.id)
