@@ -552,6 +552,13 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
   padding: 0 20px 24px;
   max-height: 90vh;
   overflow-y: auto;
+  /* --muted はフラットな --surface/--block 向けにコントラストを調整してあるため、
+     半透明のガラスパネルの上では薄すぎて読みにくい（フィールドラベル・取引明細
+     テーブルの見出し/日付列・ヒント文など、var(--muted) を使う要素すべてに影響）。
+     個別のセレクタを直すのではなく、モーダルのスコープで --muted 自体を
+     このパネル向けに底上げする。こうすると var(--muted) を参照するあらゆる
+     子要素が自動的に読みやすくなる（新しく追加する要素も含めて）。 */
+  --muted: color-mix(in srgb, var(--text) 82%, transparent);
 }
 /* ヘッダーは .modal の中に「重ねて」置かれるため、半透明な塗りは常に
    .modal 自身の半透明(--glass-bg, 約0.6)の"上に"合成される。これは掛け算で
@@ -581,10 +588,6 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
 .entry-form { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field span { font-size: 13px; color: var(--muted); }
-/* フォームは常にガラスのモーダル内にあるため、通常の --muted（不透明な --surface
-   向けに調整済み）だと半透明の背景の上ではコントラストが足りない。ここだけ
-   --text ベースにして読みやすくする（サイズ13pxで見出しとの区別は保つ）。 */
-.modal .field span { color: var(--text); opacity: 0.92; }
 .form-error { color: var(--danger); font-size: 13px; margin: 0; }
 .form-ok { color: var(--primary); font-size: 13px; margin: 0; }
 .form-warning { color: var(--warning); font-size: 13px; margin: 0; }

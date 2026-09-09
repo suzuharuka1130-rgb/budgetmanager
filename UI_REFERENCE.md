@@ -180,7 +180,7 @@ expense color, used for the aggregated "その他支出" stat.
 
 ### Form fields
 - Wrap each in `.field` (label `span` `13px muted` + control), forms use `.entry-form` (`gap:12`).
-- Inside a modal specifically (which, per §1, all entry forms always render in), field labels get a contrast bump: `.modal .field span` overrides the label to `color: var(--text)` at `opacity: 0.92` instead of plain `--muted`. `--muted` is tuned for opaque `--surface`/`--block` backgrounds and reads too low-contrast against the modal's translucent glass panel — this was a real legibility bug, fixed in the field, not by changing `--muted` itself (which stays correct everywhere else).
+- `--muted` itself is redefined inside `.modal` (`--muted: color-mix(in srgb, var(--text) 82%, transparent)`) rather than the app-wide value, which stays tuned for opaque `--surface`/`--block` backgrounds. Every element that reads `var(--muted)` — field labels, `.txn-table th`, the muted date column, `.entry-detail dt`, hint notes, even the modal's own `.icon-btn` × close — automatically gets the darker, glass-legible value just by being inside `.modal`, with no per-selector patching needed. When adding a new muted-text element inside a modal, you don't need to do anything special for it to be legible; this is the mechanism that makes that true.
 - Inputs/selects: `15px`, padding `9px 10px`, `1px var(--border)`, radius `6px`, white bg, `width:100%`. Focus → `border-color: var(--primary)`, no outline.
 - States: `.form-error` (`#dc2626`), `.form-ok` (`--primary`), `.form-warning` (`#b45309`), `.ai-fill-label` (`--primary`, 12/600).
 - Color picker: native `input[type=color]` via `.color-input` (56×36).
