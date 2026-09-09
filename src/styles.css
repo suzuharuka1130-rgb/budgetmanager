@@ -26,6 +26,17 @@
   --chip-fill-mix: white;
   --radius: 8px;
   --shadow: none;
+  /* リキッドガラス（ヘッダー・タブバー・モーダルのみ。カード/リスト/フォーム等は
+     従来どおりフラットのまま — UI_REFERENCE.md §1「リキッドガラス」参照） */
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-edge: rgba(255, 255, 255, 0.9);
+  --glass-shadow: rgba(15, 15, 15, 0.14);
+  --glass-chip-bg: rgba(255, 255, 255, 0.55);
+  /* モーダルヘッダー用。.modal 自体の半透明(0.6)の上に重なるため、ここは
+     低いアルファにして「掛け合わせた結果」がシート本体より少し濃い程度に
+     留める（詳しくは .modal-header のコメント参照）。 */
+  --glass-header-bg: rgba(255, 255, 255, 0.38);
 }
 
 :root[data-theme="dark"] {
@@ -54,6 +65,12 @@
   --chart-axis: #9b9a97;
   --chip-fill-mix: #2c2c2a;
   --shadow: none;
+  --glass-bg: rgba(44, 44, 42, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-edge: rgba(255, 255, 255, 0.14);
+  --glass-shadow: rgba(0, 0, 0, 0.5);
+  --glass-chip-bg: rgba(255, 255, 255, 0.08);
+  --glass-header-bg: rgba(20, 20, 19, 0.4);
 }
 
 * { box-sizing: border-box; }
@@ -83,8 +100,10 @@ body {
   gap: 10px;
   padding: 18px 20px 10px;
   background: var(--frosted);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  /* ガラスの縁が光を受けているような、下端の極薄ハイライト */
+  box-shadow: inset 0 -1px 0 var(--glass-edge);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -111,22 +130,26 @@ body {
 .app-main {
   flex: 1;
   padding: 8px 20px;
-  padding-bottom: 88px;
+  padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
 }
 
-/* タブバー（ヘッダーと同じフロステッドガラス効果） */
+/* タブバー — 画面下端から浮いた「リキッドガラス」ピル。frosted な塗りに加えて
+   全周の縁取り・上端のハイライト・柔らかい影で「浮いたガラス」の質感を出す。
+   カード/リスト等のフラットなコンポーネントには適用しない（意図的な使い分け）。 */
 .tab-bar {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  max-width: 720px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  left: 14px;
+  right: 14px;
+  max-width: 692px;
   margin: 0 auto;
   display: flex;
-  background: var(--frosted);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-  backdrop-filter: saturate(180%) blur(12px);
-  border-top: 1px solid var(--border);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border: 1px solid var(--glass-border);
+  border-radius: 28px;
+  box-shadow: inset 0 1px 0 var(--glass-edge), 0 10px 30px var(--glass-shadow);
   z-index: 20;
   padding: 4px;
 }
@@ -143,18 +166,20 @@ body {
   color: var(--muted);
   cursor: pointer;
   font-size: 11px;
-  border-radius: var(--radius);
+  border-radius: 20px;
   -webkit-tap-highlight-color: transparent;
 }
 .tab > .tab-icon, .tab > .tab-label { position: relative; z-index: 1; }
-.tab:hover:not(.active) { background: var(--block); }
+.tab:hover:not(.active) { background: color-mix(in srgb, var(--text) 6%, transparent); }
 .tab.active { color: var(--primary); font-weight: 600; }
+/* アクティブタブ = ガラスバーの中に浮くさらに薄いガラスチップ（ガラス・オン・ガラス） */
 .tab-active-pill {
   position: absolute;
   inset: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--glass-chip-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-edge);
+  border-radius: 20px;
   z-index: 0;
 }
 .tab-icon { display: flex; align-items: center; justify-content: center; }
@@ -503,27 +528,59 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
 .btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
 .btn.danger:hover { background: var(--danger-hover); }
 
-/* モーダル */
+/* モーダル — リキッドガラスのボトムシート/ダイアログ。背面をわずかにぼかして
+   浮き上がって見せ、パネル自体も半透明のガラスにする（中身のフォーム自体は
+   従来どおりフラットな --surface 入力のまま、シートの「器」だけがガラス）。 */
 .modal-overlay {
   position: fixed; inset: 0;
   background: var(--overlay);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
   display: flex; align-items: flex-end; justify-content: center;
   z-index: 100;
 }
 .modal {
-  background: var(--surface);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+  backdrop-filter: saturate(180%) blur(28px);
   width: 100%;
   max-width: 480px;
-  border: 1px solid var(--border);
-  border-radius: 12px 12px 0 0;
+  border: 1px solid var(--glass-border);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  box-shadow: inset 0 1px 0 var(--glass-edge), 0 -8px 40px var(--glass-shadow);
   padding: 0 20px 24px;
   max-height: 90vh;
   overflow-y: auto;
+  /* --muted はフラットな --surface/--block 向けにコントラストを調整してあるため、
+     半透明のガラスパネルの上では薄すぎて読みにくい（フィールドラベル・取引明細
+     テーブルの見出し/日付列・ヒント文など、var(--muted) を使う要素すべてに影響）。
+     個別のセレクタを直すのではなく、モーダルのスコープで --muted 自体を
+     このパネル向けに底上げする。こうすると var(--muted) を参照するあらゆる
+     子要素が自動的に読みやすくなる（新しく追加する要素も含めて）。 */
+  --muted: color-mix(in srgb, var(--text) 82%, transparent);
 }
+/* ヘッダーは .modal の中に「重ねて」置かれるため、半透明な塗りは常に
+   .modal 自身の半透明(--glass-bg, 約0.6)の"上に"合成される。これは掛け算で
+   効くため（合成後の不透明度 = 1-(1-ヘッダー側α)×(1-0.6)）、ヘッダー側に
+   var(--glass-bg) や var(--frosted) のような単体でも中程度〜高いアルファの
+   色をそのまま使うと、合成結果は 0.84〜0.93 まで跳ね上がってほぼ不透明に
+   見えてしまう（実際に2回発生した見た目のバグ）。そのため専用の低アルファ
+   トークン var(--glass-header-bg) を使い、掛け合わせた結果がシート本体より
+   気持ち濃い程度（≒0.75前後）に収まるようにしている。かといって完全に
+   透明にすると、スクロールしたフォーム要素がヘッダーの下からそのまま
+   透けて重なって見えてしまう（これも実際に発生）。ここでの値を変える時は
+   必ず「.modal の背景アルファ × ヘッダーの背景アルファ」の掛け算で
+   合成後のアルファを暗算してから調整すること。 */
 .modal-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 0 8px;
-  position: sticky; top: 0; background: var(--surface);
+  position: sticky; top: 0;
+  margin: 0 -20px; padding-left: 20px; padding-right: 20px;
+  background: var(--glass-header-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--glass-border);
 }
 .modal-header h3 { margin: 0; font-size: 17px; font-weight: 600; }
 
@@ -535,6 +592,33 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
 .form-ok { color: var(--primary); font-size: 13px; margin: 0; }
 .form-warning { color: var(--warning); font-size: 13px; margin: 0; }
 .ai-fill-label { color: var(--primary); font-size: 12px; font-weight: 600; margin: 0; }
+
+/* 編集フォームで変更できない項目（引き落とし対象月）の読み取り専用表示 */
+.field-static {
+  margin: 0;
+  padding: 9px 10px;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--block);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.field-static-note { font-size: 12px; color: var(--muted); }
+
+/* 画像を差し替えると取引明細が破棄される旨の確認 */
+.replace-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--badge-warn-border);
+  background: var(--badge-warn-bg);
+  border-radius: var(--radius);
+}
+.saved-receipt { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
 
 /* レシート画像 */
 .receipt-preview { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; }
@@ -567,6 +651,23 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
 .txn-table .txn-amount-col { text-align: right; white-space: nowrap; }
 .txn-table tfoot td { font-weight: 700; border-bottom: none; }
 .txn-receipt { margin-top: 16px; }
+
+/* 詳細モーダルの編集導線（未確定の明細のみ） */
+.txn-edit-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.txn-edit-actions .btn { width: 100%; }
+
+/* 入金明細の詳細（取引明細を持たないため項目名＋値で表示） */
+.entry-detail { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: 14px; }
+.entry-detail dt { color: var(--muted); font-size: 13px; }
+.entry-detail dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 
 /* カレンダーページ / 日別カレンダー */
 .cal-weekdays {
@@ -820,5 +921,5 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
 
 @media (min-width: 600px) {
   .modal-overlay { align-items: center; }
-  .modal { border-radius: 12px; }
+  .modal { border-radius: 20px; border-bottom: 1px solid var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-edge), 0 20px 60px var(--glass-shadow); }
 }

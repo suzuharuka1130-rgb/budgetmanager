@@ -7,7 +7,10 @@ const SAVE_DEBOUNCE_MS = 400
 // タブを切り替えて等）再度開いたときに復元するためのフック。
 // key ごとに独立して保存する（入金/カード支出/その他支出で別ドラフト）。
 // 24時間を過ぎたドラフトは古すぎるとみなして破棄する。
+// key が null のときはドラフト機能を無効にする（既存明細の編集フォームで使う。
+// 編集内容を新規登録用のドラフトに書き込んでしまわないようにするため）。
 function writeDraft(key, data) {
+  if (!key) return
   try {
     localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), data }))
   } catch {
@@ -16,6 +19,7 @@ function writeDraft(key, data) {
 }
 
 export function loadDraft(key) {
+  if (!key) return null
   try {
     const raw = localStorage.getItem(key)
     if (!raw) return null
@@ -69,6 +73,7 @@ export function useSaveDraft(key, data) {
   function clear() {
     suppressedRef.current = true
     clearTimeout(timerRef.current)
+    if (!key) return
     try {
       localStorage.removeItem(key)
     } catch {

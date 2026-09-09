@@ -119,3 +119,22 @@ export function buildBalanceSeries(months, snapshots = [], netByKey = new Map())
     return { year, month, balance: running }
   })
 }
+
+// Recharts <Tooltip> の見た目（リキッドガラス）。グラフに重なるフローティングな
+// ポップアップなので、ヘッダー/タブバー/モーダルと同じ「ガラスのchrome」カテゴリに
+// 含める（対してグラフ本体・カード等の常設コンテンツはフラットなまま）。
+// 単一のガラス層（下に別のガラスは無い）なので、モーダルヘッダーで起きたような
+// 半透明の二重合成は発生しない — 参照: UI_REFERENCE.md §1「Shadows & Liquid Glass」。
+export const glassTooltipProps = {
+  contentStyle: {
+    background: 'var(--glass-bg)',
+    backdropFilter: 'saturate(180%) blur(20px)',
+    WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+    border: '1px solid var(--glass-border)',
+    borderRadius: 12,
+    boxShadow: 'inset 0 1px 0 var(--glass-edge), 0 10px 30px var(--glass-shadow)',
+    color: 'var(--text)',
+  },
+  labelStyle: { color: 'var(--text)' },
+  itemStyle: { color: 'var(--text)' },
+}

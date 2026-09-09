@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchYear, fetchAvailableYears } from '../lib/api'
-import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR, EXPENSE_TOTAL_COLOR, shortCardName } from '../lib/helpers'
+import { currentYearMonth, formatYen, sumAmount, OTHER_COLOR, EXPENSE_TOTAL_COLOR, shortCardName, glassTooltipProps } from '../lib/helpers'
 import { StatCard, Loading, ErrorMsg } from '../components/Ui'
 import { useMeta } from '../lib/meta'
 
@@ -155,9 +155,7 @@ export default function YearlySummary() {
                   <Tooltip
                     formatter={(v) => formatYen(v)}
                     labelFormatter={(label) => (isMobile ? `${label}月` : label)}
-                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}
-                    labelStyle={{ color: 'var(--text)' }}
-                    itemStyle={{ color: 'var(--text)' }}
+                    {...glassTooltipProps}
                   />
                   <Legend
                     wrapperStyle={isMobile ? { fontSize: 11 } : undefined}

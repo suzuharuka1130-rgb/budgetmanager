@@ -22,7 +22,7 @@ export async function fetchMonth(year, month) {
 
   const balance = await computeBalanceAt(c, year, month, allBalances.data || [])
 
-  // 各明細に個別取引があるか（行クリックの判定用）と、並び替え用の代表日（最新のtxn_date）を取得する。
+  // 並び替え用の代表日（個別取引の最新 txn_date）を取得する。
   const cardRows = cards.data || []
   const otherRows = others.data || []
   const [cardTxnInfo, otherTxnInfo] = await Promise.all([
@@ -34,17 +34,17 @@ export async function fetchMonth(year, month) {
     income: income.data || [],
     cards: cardRows.map((r) => {
       const info = cardTxnInfo.get(r.id)
-      return { ...r, has_transactions: !!info, entry_date: info?.maxDate || r.created_at }
+      return { ...r, entry_date: info?.maxDate || r.created_at }
     }),
     others: otherRows.map((r) => {
       const info = otherTxnInfo.get(r.id)
-      return { ...r, has_transactions: !!info, entry_date: info?.maxDate || r.created_at }
+      return { ...r, entry_date: info?.maxDate || r.created_at }
     }),
     balance,
   }
 }
 
-// 指定テーブルで、渡した親IDごとに「個別取引の有無」と「取引日の最新値（txn_date基準）」を返す。
+// 指定テーブルで、渡した親IDごとに取引日の最新値（txn_date基準）を返す。
 // 取引日が未設定（null）の行しか無い場合は maxDate は null のまま（呼び出し側で created_at にフォールバック）。
 async function fetchTxnDateInfo(c, table, parentCol, parentIds) {
   const map = new Map()
@@ -229,18 +229,21 @@ export async function addCardExpense({ year, month, card_id, amount, note, recei
   return data.id
 }
 
-// 個別取引の行を挿入用に整形する（household_id はトリガーで自動補完）。
+// フォームの取引行を DB の列名に揃える。
 // 空行（名前・金額・日付いずれも無い）は除外する。
-function buildTxnRows(parentCol, parentId, transactions) {
+function normalizeTxns(transactions) {
   return (transactions || [])
-    .map((t, i) => ({
-      [parentCol]: parentId,
+    .map((t) => ({
       name: (t.name || '').trim(),
       amount: Number(t.amount) || 0,
       txn_date: t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : null,
-      display_order: i,
     }))
     .filter((r) => r.name !== '' || r.amount > 0 || r.txn_date !== null)
+}
+
+// 個別取引の行を挿入用に整形する（household_id はトリガーで自動補完）。
+function buildTxnRows(parentCol, parentId, transactions) {
+  return normalizeTxns(transactions).map((r, i) => ({ ...r, [parentCol]: parentId, display_order: i }))
 }
 
 async function insertTransactions(table, rows) {
@@ -269,6 +272,7 @@ export async function fetchCardExpenseTransactions(cardExpenseId) {
   return fetchTransactions('card_expense_transactions', 'card_expense_id', cardExpenseId)
 }
 
+
 // その他支出の個別取引を一括挿入する。
 export async function addOtherExpenseTransactions(otherExpenseId, transactions) {
   await insertTransactions('other_expense_transactions', buildTxnRows('other_expense_id', otherExpenseId, transactions))
@@ -292,6 +296,13 @@ export async function uploadReceipt(file, { year, month, card_id }) {
   })
   if (error) throw error
   return path
+}
+
+// 差し替えで不要になった画像をストレージから削除する
+export async function deleteReceipt(path) {
+  if (!path) return
+  const { error } = await client().storage.from(RECEIPTS_BUCKET).remove([path])
+  if (error) throw error
 }
 
 // 非公開バケットの画像を表示するための署名付きURL（既定60秒）
@@ -345,6 +356,68 @@ export async function confirmCardExpense(id) {
 
 export async function confirmOtherExpense(id) {
   const { error } = await client().from('other_expenses').update({ confirmed: true }).eq('id', id)
+  if (error) throw error
+}
+
+// ---- 未確定に戻す（確定を取り消して再び編集できるようにする）----
+// 過去月・当月の明細でも未確定に戻せる。未確定の間は合計・口座残高から除外される。
+async function setUnconfirmed(table, id) {
+  const { error } = await client().from(table).update({ confirmed: false }).eq('id', id)
+  if (error) throw error
+}
+
+export async function unconfirmIncome(id) {
+  await setUnconfirmed('monthly_income', id)
+}
+
+export async function unconfirmCardExpense(id) {
+  await setUnconfirmed('card_expenses', id)
+}
+
+export async function unconfirmOtherExpense(id) {
+  await setUnconfirmed('other_expenses', id)
+}
+
+// ---- 編集（未確定の明細のみ）----
+// 入金は取引明細を持たないので単純な update で足りる。confirmed=false を条件に含めることで、
+// 別タブ・別ユーザーが先に確定した明細を黙って書き換えてしまうのを防ぐ。
+export async function updateIncome(id, { amount, note }) {
+  const { data, error } = await client()
+    .from('monthly_income')
+    .update({ amount, note })
+    .eq('id', id)
+    .eq('confirmed', false)
+    .select('id')
+  if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error('この明細はすでに確定済みか、削除されています。画面を更新してください。')
+  }
+}
+
+// カード支出・その他支出は本体と取引明細をまとめて書き換える。
+// 本体だけ更新されて取引明細が古いまま残らないよう、Postgres 関数
+// （migrations/edit_pending_entries.sql）で1トランザクションにまとめている。
+// 確定済み・他世帯の明細に対しては関数側がエラーを返す。
+export async function updateCardExpense(id, { card_id, amount, note, receipt_image_url, transactions }) {
+  const { error } = await client().rpc('update_pending_card_expense', {
+    p_id: id,
+    p_card_id: card_id,
+    p_amount: amount,
+    p_note: note,
+    p_receipt_image_url: receipt_image_url,
+    p_rows: normalizeTxns(transactions),
+  })
+  if (error) throw error
+}
+
+export async function updateOtherExpense(id, { expense_type_id, amount, note, transactions }) {
+  const { error } = await client().rpc('update_pending_other_expense', {
+    p_id: id,
+    p_expense_type_id: expense_type_id,
+    p_amount: amount,
+    p_note: note,
+    p_rows: normalizeTxns(transactions),
+  })
   if (error) throw error
 }
 

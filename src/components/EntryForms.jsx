@@ -1,6 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
-import { currentYearMonth, toMonthValue, fromMonthValue } from '../lib/helpers'
-import { addIncome, addCardExpense, addCardExpenseTransactions, addOtherExpense, addOtherExpenseTransactions, setAccountBalance, uploadReceipt } from '../lib/api'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { currentYearMonth, toMonthValue, fromMonthValue, monthLabel } from '../lib/helpers'
+import {
+  addIncome, addCardExpense, addCardExpenseTransactions, addOtherExpense, addOtherExpenseTransactions,
+  setAccountBalance, uploadReceipt, deleteReceipt, getReceiptSignedUrl,
+  updateIncome, updateCardExpense, updateOtherExpense,
+} from '../lib/api'
 import { analyzeReceipt } from '../lib/supabase'
 import { useMeta } from '../lib/meta'
 import { useDraftState, useSaveDraft, sanitizeMonthVal } from '../lib/useDraft'
@@ -31,6 +35,51 @@ function makeTxnId() {
 // 取引行配列に（無ければ）idを補完する。下書き復元やOCR抽出結果はidを持たないため。
 function withTxnIds(list) {
   return (list || []).map((t) => (t.id ? t : { ...t, id: makeTxnId() }))
+}
+
+// DB の取引行（txn_date / 数値 amount）をフォームの編集行（date / 文字列 amount）に変換する。
+// 未確定明細の編集フォームを開くときに使う。
+function toEditorTxns(rows) {
+  return (rows || []).map((r) => ({
+    id: makeTxnId(),
+    name: r.name || '',
+    amount: r.amount != null ? String(Math.round(Number(r.amount) || 0)) : '',
+    date: r.txn_date || '',
+  }))
+}
+
+// 保存済みの合計が取引明細の合計と一致しない＝ユーザーが合計を手入力したとみなす。
+// 編集フォームを開いた時点で「手入力」扱いにしておかないと、取引を1行触っただけで
+// 自動合計に上書きされてしまう。
+function hasManualTotal(entry) {
+  const rows = entry?.txns || []
+  if (!rows.length) return true
+  const sum = rows.reduce((s, t) => s + (Number(t.amount) || 0), 0)
+  return Math.round(Number(entry.amount) || 0) !== Math.round(sum)
+}
+
+// 編集フォームの取引エディタ初期値。ドラフト（新規登録）とは排他。
+// manualTotal を渡すと合計の手入力判定を上書きする。その他支出は金額欄を持たず
+// 合計が常に取引明細の合計なので、手入力扱いにすると合計を直せなくなるため false を渡す。
+// blankRowWhenEmpty は、取引明細が1件も無い明細を編集するときに空行を1つ出す。
+function editorInitial(entry, draft, { manualTotal, blankRowWhenEmpty = false } = {}) {
+  if (entry) {
+    const txns = toEditorTxns(entry.txns)
+    return {
+      txns: txns.length === 0 && blankRowWhenEmpty ? [{ name: '', amount: '', date: '' }] : txns,
+      amount: entry.amount != null ? String(Math.round(Number(entry.amount) || 0)) : '',
+      amountManual: manualTotal ?? hasManualTotal(entry),
+    }
+  }
+  return draft ? { txns: draft.txns, amount: draft.amount, amountManual: draft.amountManual } : undefined
+}
+
+// マスタから外された（is_active=false）カード・種別を選んでいる既存明細を編集する場合、
+// 選択肢に出ないと現在の選択が消えてしまうため、その1件だけ末尾に足す。
+function withCurrentOption(activeItems, allItems, currentId) {
+  if (currentId == null || activeItems.some((x) => x.id === currentId)) return activeItems
+  const own = allItems.find((x) => x.id === currentId)
+  return own ? [...activeItems, own] : activeItems
 }
 
 // year/month に対して delta ヶ月ぶんずらした {year, month} を返す
@@ -113,14 +162,23 @@ const DRAFT_KEYS = {
   other: 'kakeibo:draft:other',
 }
 
-function FormShell({ onSubmit, submitting, error, children }) {
+function FormShell({ onSubmit, submitting, error, onCancel, children }) {
   return (
     <form className="entry-form" onSubmit={onSubmit}>
       {children}
       {error && <p className="form-error">{error}</p>}
-      <button type="submit" className="btn primary" disabled={submitting}>
-        {submitting ? '保存中...' : '保存'}
-      </button>
+      {onCancel ? (
+        <div className="confirm-actions">
+          <button type="button" className="btn" onClick={onCancel} disabled={submitting}>キャンセル</button>
+          <button type="submit" className="btn primary" disabled={submitting}>
+            {submitting ? '保存中...' : '保存'}
+          </button>
+        </div>
+      ) : (
+        <button type="submit" className="btn primary" disabled={submitting}>
+          {submitting ? '保存中...' : '保存'}
+        </button>
+      )}
     </form>
   )
 }
@@ -131,7 +189,21 @@ function validateAmount(value) {
   return null
 }
 
-function MonthField({ value, onChange, label = '引き落とし対象月' }) {
+function MonthField({ value, onChange, label = '引き落とし対象月', locked = false }) {
+  // 編集時は対象月を変更できない。月を動かすと確定/未確定の判定や口座残高の
+  // 計算対象月まで変わってしまうため、月を変えたいときは削除して登録し直す。
+  if (locked) {
+    const { year, month } = fromMonthValue(value)
+    return (
+      <div className="field">
+        <span>{label}</span>
+        <p className="field-static">
+          {monthLabel(year, month)}
+          <span className="field-static-note">変更できません</span>
+        </p>
+      </div>
+    )
+  }
   return (
     <label className="field">
       <span>{label}</span>
@@ -302,15 +374,20 @@ function AmountAndTransactions({ editor, namePlaceholder, amountLabel, showAmoun
   )
 }
 
-export function IncomeForm({ onSaved }) {
-  const draft = useDraftState(DRAFT_KEYS.income, null)
-  const [monthVal, setMonthVal] = useMonthState(sanitizeMonthVal(draft?.monthVal))
-  const [amount, setAmount] = useState(draft?.amount ?? '')
-  const [note, setNote] = useState(draft?.note ?? '')
+// entry を渡すと既存の未確定明細の編集フォームになる（入金月は変更不可、ドラフト保存なし）。
+export function IncomeForm({ onSaved, entry, onCancel }) {
+  const isEdit = !!entry
+  const draftKey = isEdit ? null : DRAFT_KEYS.income
+  const draft = useDraftState(draftKey, null)
+  const [monthVal, setMonthVal] = useMonthState(
+    isEdit ? toMonthValue(entry.year, entry.month) : sanitizeMonthVal(draft?.monthVal),
+  )
+  const [amount, setAmount] = useState(isEdit ? String(Math.round(Number(entry.amount) || 0)) : (draft?.amount ?? ''))
+  const [note, setNote] = useState((isEdit ? entry.note : draft?.note) ?? '')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const clearDraft = useSaveDraft(DRAFT_KEYS.income, { monthVal, amount, note })
+  const clearDraft = useSaveDraft(draftKey, { monthVal, amount, note })
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -319,8 +396,12 @@ export function IncomeForm({ onSaved }) {
     setSubmitting(true)
     setError(null)
     try {
-      const { year, month } = fromMonthValue(monthVal)
-      await addIncome({ year, month, amount: Number(amount), note: note || null })
+      if (isEdit) {
+        await updateIncome(entry.id, { amount: Number(amount), note: note || null })
+      } else {
+        const { year, month } = fromMonthValue(monthVal)
+        await addIncome({ year, month, amount: Number(amount), note: note || null })
+      }
       clearDraft()
       onSaved()
     } catch (e2) {
@@ -331,24 +412,31 @@ export function IncomeForm({ onSaved }) {
   }
 
   return (
-    <FormShell onSubmit={handleSubmit} submitting={submitting} error={error}>
-      <MonthField value={monthVal} onChange={setMonthVal} label="入金月" />
+    <FormShell onSubmit={handleSubmit} submitting={submitting} error={error} onCancel={onCancel}>
+      <MonthField value={monthVal} onChange={setMonthVal} label="入金月" locked={isEdit} />
       <AmountField value={amount} onChange={setAmount} label="入金額（円）" />
       <NoteField value={note} onChange={setNote} />
     </FormShell>
   )
 }
 
-export function CardExpenseForm({ onSaved }) {
-  const { activeCards } = useMeta()
-  const draft = useDraftState(DRAFT_KEYS.card, null)
-  const [monthVal, setMonthVal] = useMonthState(sanitizeMonthVal(draft?.monthVal))
-  const [cardId, setCardId] = useState(draft?.cardId ?? '')
+// entry を渡すと既存の未確定明細の編集フォームになる。
+// 編集時は対象月を変更できず、ドラフト保存も行わない。画像を選び直すと
+// 既存の取引明細が破棄されるため、その前に確認を挟む。
+export function CardExpenseForm({ onSaved, entry, onCancel }) {
+  const isEdit = !!entry
+  const { activeCards, cards } = useMeta()
+  const draftKey = isEdit ? null : DRAFT_KEYS.card
+  const draft = useDraftState(draftKey, null)
+  const [monthVal, setMonthVal] = useMonthState(
+    isEdit ? toMonthValue(entry.year, entry.month) : sanitizeMonthVal(draft?.monthVal),
+  )
+  const [cardId, setCardId] = useState((isEdit ? entry.card_id : draft?.cardId) ?? '')
   const editor = useTransactionEditor(monthVal, {
     deferredBilling: true,
-    initial: draft ? { txns: draft.txns, amount: draft.amount, amountManual: draft.amountManual } : undefined,
+    initial: editorInitial(entry, draft),
   })
-  const [note, setNote] = useState(draft?.note ?? '')
+  const [note, setNote] = useState((isEdit ? entry.note : draft?.note) ?? '')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   // レシート画像は容量の都合上ドラフトに含めない（再度添付が必要）
@@ -357,16 +445,39 @@ export function CardExpenseForm({ onSaved }) {
   const [analyzing, setAnalyzing] = useState(false)
   const [aiFilled, setAiFilled] = useState(false)
   const [warning, setWarning] = useState(null)
+  // 編集時、画像の差し替えで取引明細が消える旨を確認するために選択ファイルを一旦保留する
+  const [pendingFile, setPendingFile] = useState(null)
+  const [savedImage, setSavedImage] = useState(null) // 登録済み画像 { url, loading, error }
+  const fileInputRef = useRef(null)
 
-  const clearDraft = useSaveDraft(DRAFT_KEYS.card, {
+  const clearDraft = useSaveDraft(draftKey, {
     monthVal, cardId, note,
     txns: editor.txns, amount: editor.amount, amountManual: editor.amountManual,
   })
+
+  // 無効化されたカードに紐づく明細でも、現在の選択がチップから消えないようにする
+  const selectableCards = useMemo(
+    () => (isEdit ? withCurrentOption(activeCards, cards, entry.card_id) : activeCards),
+    [isEdit, activeCards, cards, entry],
+  )
 
   // カード一覧読み込み後、未選択なら先頭を選択
   useEffect(() => {
     if (!cardId && activeCards.length) setCardId(activeCards[0].id)
   }, [activeCards, cardId])
+
+  // ファイル選択欄をリセットする（同じファイルを選び直しても change が発火するように）
+  function resetFileInput() {
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // 選択したファイルを実際に採用する。取引明細はいったん空にして読み取り直しに備える。
+  function applyFile(f) {
+    setFile(f)
+    setPreviewUrl(URL.createObjectURL(f))
+    setAiFilled(false)
+    editor.clearTxns()
+  }
 
   function handleFileChange(e) {
     setError(null)
@@ -375,16 +486,40 @@ export function CardExpenseForm({ onSaved }) {
     if (!f) return
     if (!['image/jpeg', 'image/png'].includes(f.type)) {
       setError('JPEGまたはPNG画像を選択してください。')
+      resetFileInput()
       return
     }
     if (f.size > MAX_RECEIPT_BYTES) {
       setError('画像サイズは10MBまでです。')
+      resetFileInput()
       return
     }
-    setFile(f)
-    setPreviewUrl(URL.createObjectURL(f))
-    setAiFilled(false)
-    editor.clearTxns()
+    // 編集時、失うものがある場合だけ確認する
+    if (isEdit && (editor.txns.length > 0 || entry.receipt_image_url)) {
+      setPendingFile(f)
+      return
+    }
+    applyFile(f)
+  }
+
+  function acceptPendingFile() {
+    applyFile(pendingFile)
+    setPendingFile(null)
+  }
+
+  function cancelPendingFile() {
+    setPendingFile(null)
+    resetFileInput()
+  }
+
+  async function showSavedImage() {
+    setSavedImage({ url: null, loading: true, error: null })
+    try {
+      const url = await getReceiptSignedUrl(entry.receipt_image_url, 120)
+      setSavedImage({ url, loading: false, error: null })
+    } catch (err) {
+      setSavedImage({ url: null, loading: false, error: err.message || String(err) })
+    }
   }
 
   async function handleAnalyze() {
@@ -411,28 +546,52 @@ export function CardExpenseForm({ onSaved }) {
     const err = validateAmount(editor.amount)
     if (err) return setError(err)
     if (!cardId) return setError('カードを選択してください。')
+    if (pendingFile) return setError('画像の差し替えを確定するか、取り消してください。')
     setSubmitting(true)
     setError(null)
     setWarning(null)
     try {
       const { year, month } = fromMonthValue(monthVal)
-      let receiptPath = null
-      if (file) {
-        try {
-          receiptPath = await uploadReceipt(file, { year, month, card_id: cardId })
-        } catch {
-          setWarning('画像のアップロードに失敗しました。明細のみ保存します。')
+      const payload = { card_id: cardId, amount: Number(editor.amount), note: note || null }
+      if (isEdit) {
+        // 画像を差し替えた場合、新しい画像のアップロード成功後にだけ参照を切り替え、
+        // 本体と取引明細を保存し終えてから古い画像を消す。
+        let receiptPath = entry.receipt_image_url
+        let stalePath = null
+        if (file) {
+          try {
+            receiptPath = await uploadReceipt(file, { year, month, card_id: cardId })
+            stalePath = entry.receipt_image_url
+          } catch {
+            receiptPath = entry.receipt_image_url
+            setWarning('画像のアップロードに失敗しました。登録済みの画像のまま保存します。')
+          }
         }
-      }
-      const cardExpenseId = await addCardExpense({
-        year, month, card_id: cardId, amount: Number(editor.amount),
-        note: note || null, receipt_image_url: receiptPath,
-      })
-      if (editor.txns.length) {
-        try {
-          await addCardExpenseTransactions(cardExpenseId, editor.txns)
-        } catch {
-          setWarning('取引明細の保存に一部失敗しました。合計は保存されました。')
+        await updateCardExpense(entry.id, {
+          ...payload, receipt_image_url: receiptPath, transactions: editor.txns,
+        })
+        if (stalePath) {
+          // 古い画像が消せなくても表示には影響しない（ストレージに残るだけ）
+          try { await deleteReceipt(stalePath) } catch { /* no-op */ }
+        }
+      } else {
+        let receiptPath = null
+        if (file) {
+          try {
+            receiptPath = await uploadReceipt(file, { year, month, card_id: cardId })
+          } catch {
+            setWarning('画像のアップロードに失敗しました。明細のみ保存します。')
+          }
+        }
+        const cardExpenseId = await addCardExpense({
+          year, month, ...payload, receipt_image_url: receiptPath,
+        })
+        if (editor.txns.length) {
+          try {
+            await addCardExpenseTransactions(cardExpenseId, editor.txns)
+          } catch {
+            setWarning('取引明細の保存に一部失敗しました。合計は保存されました。')
+          }
         }
       }
       clearDraft()
@@ -445,12 +604,12 @@ export function CardExpenseForm({ onSaved }) {
   }
 
   return (
-    <FormShell onSubmit={handleSubmit} submitting={submitting} error={error}>
-      <MonthField value={monthVal} onChange={setMonthVal} />
+    <FormShell onSubmit={handleSubmit} submitting={submitting} error={error} onCancel={onCancel}>
+      <MonthField value={monthVal} onChange={setMonthVal} locked={isEdit} />
       <div className="field">
         <span>カード</span>
         <div className="chip-row">
-          {activeCards.map((c) => (
+          {selectableCards.map((c) => (
             <button
               key={c.id}
               type="button"
@@ -467,7 +626,28 @@ export function CardExpenseForm({ onSaved }) {
 
       <div className="field">
         <span>レシート/明細画像（任意・JPEG/PNG）</span>
-        <input type="file" accept="image/jpeg,image/png" onChange={handleFileChange} />
+        {isEdit && entry.receipt_image_url && !file && (
+          <div className="saved-receipt">
+            {!savedImage && (
+              <button type="button" className="btn" onClick={showSavedImage}>登録済みの画像を表示</button>
+            )}
+            {savedImage?.loading && <p className="muted">読み込み中...</p>}
+            {savedImage?.error && <p className="form-error">画像の取得に失敗しました: {savedImage.error}</p>}
+            {savedImage?.url && <img className="receipt-full" src={savedImage.url} alt="登録済みの明細画像" />}
+          </div>
+        )}
+        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png" onChange={handleFileChange} />
+        {pendingFile && (
+          <div className="replace-confirm">
+            <p className="form-warning">
+              画像を差し替えると、いまの取引明細{entry.receipt_image_url ? 'と登録済みの画像' : ''}は破棄されます。
+            </p>
+            <div className="confirm-actions">
+              <button type="button" className="btn" onClick={cancelPendingFile}>キャンセル</button>
+              <button type="button" className="btn primary" onClick={acceptPendingFile}>差し替える</button>
+            </div>
+          </div>
+        )}
         {previewUrl && (
           <div className="receipt-preview">
             <img src={previewUrl} alt="プレビュー" />
@@ -487,24 +667,35 @@ export function CardExpenseForm({ onSaved }) {
   )
 }
 
-export function OtherExpenseForm({ onSaved }) {
-  const { activeOtherTypes } = useMeta()
-  const draft = useDraftState(DRAFT_KEYS.other, null)
-  const [monthVal, setMonthVal] = useMonthState(sanitizeMonthVal(draft?.monthVal))
-  const [typeId, setTypeId] = useState(draft?.typeId ?? '')
+// entry を渡すと既存の未確定明細の編集フォームになる（対象月は変更不可、ドラフト保存なし）。
+export function OtherExpenseForm({ onSaved, entry, onCancel }) {
+  const isEdit = !!entry
+  const { activeOtherTypes, otherTypes } = useMeta()
+  const draftKey = isEdit ? null : DRAFT_KEYS.other
+  const draft = useDraftState(draftKey, null)
+  const [monthVal, setMonthVal] = useMonthState(
+    isEdit ? toMonthValue(entry.year, entry.month) : sanitizeMonthVal(draft?.monthVal),
+  )
+  const [typeId, setTypeId] = useState((isEdit ? entry.expense_type_id : draft?.typeId) ?? '')
   const editor = useTransactionEditor(monthVal, {
     startWithBlankRow: true,
-    initial: draft ? { txns: draft.txns, amount: draft.amount, amountManual: draft.amountManual } : undefined,
+    initial: editorInitial(entry, draft, { manualTotal: false, blankRowWhenEmpty: true }),
   })
-  const [note, setNote] = useState(draft?.note ?? '')
+  const [note, setNote] = useState((isEdit ? entry.note : draft?.note) ?? '')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [warning, setWarning] = useState(null)
 
-  const clearDraft = useSaveDraft(DRAFT_KEYS.other, {
+  const clearDraft = useSaveDraft(draftKey, {
     monthVal, typeId, note,
     txns: editor.txns, amount: editor.amount, amountManual: editor.amountManual,
   })
+
+  // 無効化された種別に紐づく明細でも、現在の選択が select から消えないようにする
+  const selectableTypes = useMemo(
+    () => (isEdit ? withCurrentOption(activeOtherTypes, otherTypes, entry.expense_type_id) : activeOtherTypes),
+    [isEdit, activeOtherTypes, otherTypes, entry],
+  )
 
   useEffect(() => {
     if (!typeId && activeOtherTypes.length) setTypeId(activeOtherTypes[0].id)
@@ -519,15 +710,18 @@ export function OtherExpenseForm({ onSaved }) {
     setError(null)
     setWarning(null)
     try {
-      const { year, month } = fromMonthValue(monthVal)
-      const otherExpenseId = await addOtherExpense({
-        year, month, expense_type_id: typeId, amount: Number(editor.amount), note: note || null,
-      })
-      if (editor.txns.length) {
-        try {
-          await addOtherExpenseTransactions(otherExpenseId, editor.txns)
-        } catch {
-          setWarning('取引明細の保存に一部失敗しました。合計は保存されました。')
+      const payload = { expense_type_id: typeId, amount: Number(editor.amount), note: note || null }
+      if (isEdit) {
+        await updateOtherExpense(entry.id, { ...payload, transactions: editor.txns })
+      } else {
+        const { year, month } = fromMonthValue(monthVal)
+        const otherExpenseId = await addOtherExpense({ year, month, ...payload })
+        if (editor.txns.length) {
+          try {
+            await addOtherExpenseTransactions(otherExpenseId, editor.txns)
+          } catch {
+            setWarning('取引明細の保存に一部失敗しました。合計は保存されました。')
+          }
         }
       }
       clearDraft()
@@ -540,12 +734,12 @@ export function OtherExpenseForm({ onSaved }) {
   }
 
   return (
-    <FormShell onSubmit={handleSubmit} submitting={submitting} error={error}>
-      <MonthField value={monthVal} onChange={setMonthVal} />
+    <FormShell onSubmit={handleSubmit} submitting={submitting} error={error} onCancel={onCancel}>
+      <MonthField value={monthVal} onChange={setMonthVal} locked={isEdit} />
       <label className="field">
         <span>種別</span>
         <select value={typeId} onChange={(e) => setTypeId(e.target.value)}>
-          {activeOtherTypes.map((t) => (
+          {selectableTypes.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
