@@ -32,7 +32,13 @@
   --glass-border: rgba(255, 255, 255, 0.7);
   --glass-edge: rgba(255, 255, 255, 0.9);
   --glass-shadow: rgba(15, 15, 15, 0.14);
-  --glass-chip-bg: rgba(255, 255, 255, 0.55);
+  /* アクティブタブのピル。中立の白(rgba(255,255,255,0.55))だと、これもほぼ白い
+     タブバー本体の上でコントラストがほぼ無く、「どのタブが選択中か」が
+     ライトモードで見えにくかった（実際に指摘された見た目のバグ）。
+     ニュートラルな白ではなく --primary を混ぜた緑みのガラスにして、
+     周囲のバーと色相そのもので区別できるようにする。 */
+  --glass-chip-bg: rgba(22, 101, 52, 0.16);
+  --glass-chip-border: rgba(22, 101, 52, 0.4);
   /* モーダルヘッダー用。.modal 自体の半透明(0.6)の上に重なるため、ここは
      低いアルファにして「掛け合わせた結果」がシート本体より少し濃い程度に
      留める（詳しくは .modal-header のコメント参照）。 */
@@ -69,7 +75,8 @@
   --glass-border: rgba(255, 255, 255, 0.09);
   --glass-edge: rgba(255, 255, 255, 0.14);
   --glass-shadow: rgba(0, 0, 0, 0.5);
-  --glass-chip-bg: rgba(255, 255, 255, 0.08);
+  --glass-chip-bg: rgba(34, 197, 94, 0.22);
+  --glass-chip-border: rgba(34, 197, 94, 0.45);
   --glass-header-bg: rgba(20, 20, 19, 0.4);
 }
 
@@ -177,7 +184,7 @@ body {
   position: absolute;
   inset: 0;
   background: var(--glass-chip-bg);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--glass-chip-border);
   box-shadow: inset 0 1px 0 var(--glass-edge);
   border-radius: 20px;
   z-index: 0;

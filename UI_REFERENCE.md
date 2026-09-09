@@ -38,7 +38,7 @@ Always reach for `var(--…)` — never re-introduce raw chrome hex in JSX or ne
 | `--glass-border` | `rgba(255,255,255,0.7)` | `rgba(255,255,255,0.09)` | Glass panel edge (all sides) |
 | `--glass-edge` | `rgba(255,255,255,0.9)` | `rgba(255,255,255,0.14)` | Glass "specular" highlight — 1px inset top/bottom |
 | `--glass-shadow` | `rgba(15,15,15,0.14)` | `rgba(0,0,0,0.5)` | Soft shadow under floating glass panels |
-| `--glass-chip-bg` | `rgba(255,255,255,0.55)` | `rgba(255,255,255,0.08)` | Glass-on-glass chip: the active tab pill inside the tab bar |
+| `--glass-chip-bg` / `--glass-chip-border` | `rgba(22,101,52,0.16)` / `rgba(22,101,52,0.4)` | `rgba(34,197,94,0.22)` / `rgba(34,197,94,0.45)` | Active tab pill fill/border — tinted with `--primary`, not neutral white, so it reads as a distinct chip against the equally-light frosted tab bar (a neutral-white pill here was a real contrast bug in light mode) |
 | `--glass-header-bg` | `rgba(255,255,255,0.38)` | `rgba(20,20,19,0.4)` | Modal's own sticky header — deliberately low-alpha; see §2 `Modal` for why |
 | `--pending-bg` | `#fbfaf7` | `#242422` | Pending (未確定) row background |
 | `--badge-warn-bg` / `--badge-warn-border` / `--badge-warn-text` | `#fef3c7` / `#fde68a` / `#b45309` | `#3f2d10` / `#6b4a1a` / `#fbbf24` | 未確定 pill |
@@ -194,7 +194,7 @@ expense color, used for the aggregated "その他支出" stat.
 
 ### Tab navigation (bottom, liquid glass)
 - **Floating**, not edge-to-edge: fixed `bottom: 14px + safe-area`, inset `14px` from both sides, `max-width:692px` (centered within the 720px app), `border-radius:28px`. Glass panel: `--glass-bg` + `backdrop-filter: blur(24px) saturate(180%)`, `1px --glass-border` on all sides, inset `--glass-edge` top highlight, soft `--glass-shadow` drop shadow (it's floating above content, unlike the header). 5 tabs (今月/月次/年次/トレンド/設定), line-art SVG icons (22px) + `11px` label.
-- Active tab: `--primary` text + a sliding **glass-on-glass** pill (`.tab-active-pill` — `--glass-chip-bg` + `--glass-border` + inset `--glass-edge`, `border-radius:20px`, Framer Motion `layoutId`). Inactive hover → a faint `color-mix(in srgb, var(--text) 6%, transparent)` tint (not `--block`, which would read as an opaque surface breaking the glass).
+- Active tab: `--primary` text + a sliding **glass-on-glass** pill (`.tab-active-pill` — `--glass-chip-bg` + `--glass-chip-border` + inset `--glass-edge`, `border-radius:20px`, Framer Motion `layoutId`). The pill is tinted green (derived from `--primary`), not neutral white/gray — a neutral chip on top of the equally-neutral frosted bar was nearly invisible in light mode, so "which tab is selected" relied on the small text-color change alone. If you ever revisit this pill's color, keep it tinted rather than reverting to a neutral fill. Inactive hover → a faint `color-mix(in srgb, var(--text) 6%, transparent)` tint (not `--block`, which would read as an opaque surface breaking the glass).
 - `app-main` bottom padding is `112px + safe-area` (not the tab bar's own height) to clear the floating bar with room for its shadow.
 - `index.html`'s viewport meta includes `viewport-fit=cover` so `env(safe-area-inset-bottom)` resolves on notched/home-indicator devices.
 
