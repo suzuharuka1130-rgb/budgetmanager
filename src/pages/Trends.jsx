@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchRange, fetchAvailableYears } from '../lib/api'
-import { currentYearMonth, formatYen, sumAmount, netByMonthMap, buildBalanceSeries, shortCardName } from '../lib/helpers'
+import { currentYearMonth, formatYen, sumAmount, netByMonthMap, buildBalanceSeries, shortCardName, glassTooltipProps } from '../lib/helpers'
 import { Loading, ErrorMsg } from '../components/Ui'
 import { useMeta } from '../lib/meta'
 
@@ -143,7 +143,7 @@ export default function Trends() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
                   <XAxis dataKey="name" fontSize={12} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
                   <YAxis tickFormatter={yTick} fontSize={11} width={56} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
-                  <Tooltip formatter={(v) => formatYen(v)} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} labelStyle={{ color: 'var(--text)' }} itemStyle={{ color: 'var(--text)' }} />
+                  <Tooltip formatter={(v) => formatYen(v)} {...glassTooltipProps} />
                   <Line type="monotone" dataKey="残高" stroke="#0ea5e9" strokeWidth={2} connectNulls dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -160,7 +160,7 @@ export default function Trends() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
                   <XAxis dataKey="name" fontSize={12} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
                   <YAxis tickFormatter={yTick} fontSize={11} width={56} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
-                  <Tooltip formatter={(v) => formatYen(v)} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} labelStyle={{ color: 'var(--text)' }} itemStyle={{ color: 'var(--text)' }} />
+                  <Tooltip formatter={(v) => formatYen(v)} {...glassTooltipProps} />
                   <Legend
                     wrapperStyle={isMobile ? { fontSize: 11 } : undefined}
                     formatter={(value) => (isMobile ? shortCardName(value) : value)}
