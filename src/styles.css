@@ -536,6 +536,33 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
 .form-warning { color: var(--warning); font-size: 13px; margin: 0; }
 .ai-fill-label { color: var(--primary); font-size: 12px; font-weight: 600; margin: 0; }
 
+/* 編集フォームで変更できない項目（引き落とし対象月）の読み取り専用表示 */
+.field-static {
+  margin: 0;
+  padding: 9px 10px;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--block);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.field-static-note { font-size: 12px; color: var(--muted); }
+
+/* 画像を差し替えると取引明細が破棄される旨の確認 */
+.replace-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--badge-warn-border);
+  background: var(--badge-warn-bg);
+  border-radius: var(--radius);
+}
+.saved-receipt { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+
 /* レシート画像 */
 .receipt-preview { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; }
 .receipt-preview img {
@@ -567,6 +594,23 @@ textarea { font-family: inherit; line-height: 1.5; resize: vertical; min-height:
 .txn-table .txn-amount-col { text-align: right; white-space: nowrap; }
 .txn-table tfoot td { font-weight: 700; border-bottom: none; }
 .txn-receipt { margin-top: 16px; }
+
+/* 詳細モーダルの編集導線（未確定の明細のみ） */
+.txn-edit-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.txn-edit-actions .btn { width: 100%; }
+
+/* 入金明細の詳細（取引明細を持たないため項目名＋値で表示） */
+.entry-detail { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: 14px; }
+.entry-detail dt { color: var(--muted); font-size: 13px; }
+.entry-detail dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 
 /* カレンダーページ / 日別カレンダー */
 .cal-weekdays {
