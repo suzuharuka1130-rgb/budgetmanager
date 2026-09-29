@@ -5,18 +5,29 @@ import { getSecretKey } from '../_shared/keys.ts'
 
 const LINE_REPLY_URL = 'https://api.line.me/v2/bot/message/reply'
 
-// x-line-signature を channel secret で検証（未設定なら検証スキップ）
+// x-line-signature を channel secret で検証する。
+// secret が未設定の場合は全リクエストを拒否する（以前は検証をスキップしていたため、
+// 設定漏れがあると誰でも偽のイベントを送って連携コードを総当たりできた）。
 async function verifySignature(body: string, signature: string | null): Promise<boolean> {
   const secret = Deno.env.get('LINE_CHANNEL_SECRET')
-  if (!secret) return true
-  if (!signature) return false
+  if (!secret || !signature) return false
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret),
     { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
   )
   const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body))
   const expected = btoa(String.fromCharCode(...new Uint8Array(mac)))
-  return expected === signature
+  return timingSafeEqual(expected, signature)
+}
+
+// 一致するまでの比較時間から署名を推測されないよう、長さが同じなら常に全文字を比較する
+function timingSafeEqual(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a)
+  const y = new TextEncoder().encode(b)
+  if (x.length !== y.length) return false
+  let diff = 0
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i]
+  return diff === 0
 }
 
 async function reply(token: string, text: string) {
@@ -53,8 +64,9 @@ Deno.serve(async (req) => {
       .from('household_members')
       .select('id, line_link_expires')
       .eq('line_link_code', code)
+    // 期限のないコードは受け付けない（create_line_link_code は必ず30分の期限を付ける）
     const m = (members ?? []).find(
-      (x: { line_link_expires?: string }) => !x.line_link_expires || new Date(x.line_link_expires) > new Date(),
+      (x: { line_link_expires?: string }) => !!x.line_link_expires && new Date(x.line_link_expires) > new Date(),
     )
 
     if (m) {
