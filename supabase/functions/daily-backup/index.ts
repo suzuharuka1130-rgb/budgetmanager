@@ -1,7 +1,9 @@
 // 毎日 1:00 JST（前日 16:00 UTC）— 全テーブルを JSON にまとめて Google Drive にバックアップ。
-// cron: service role で起動（全世帯分を1ファイルにバックアップ、全世帯にログを記録）。
-// 手動（設定画面の「今すぐバックアップ」）: 認証ヘッダー付きで呼び出し、呼び出しユーザーの
-//   世帯にログを記録する。
+// cron: secret キーで起動（全世帯分を1ファイルにバックアップ、全世帯にログを記録）。
+// 手動（設定画面の「今すぐバックアップ」）: 認証ヘッダー付きで呼び出す。呼び出しユーザーの
+//   世帯のデータだけを別名（kakeibo-manual-...）で保存し、その世帯にログを記録する。
+//   手動分は日次バックアップとは別枠で保持件数を管理し、連打しても日次バックアップが
+//   押し出されて消えないようにする（以前は30回押すと過去の日次バックアップが全て消えた）。
 //
 // ===== Google Drive セットアップ（OAuth リフレッシュトークン / 個人Gmail対応）=====
 // サービスアカウントは個人Gmailのドライブに保存できない（容量割当なし）ため、
@@ -40,6 +42,9 @@ const BACKUP_TABLES = [
 const FOLDER_NAME = 'KakeiboBackups'
 const FILE_PREFIX = 'kakeibo-backup-'
 const KEEP_FILES = 30
+const MANUAL_FILE_PREFIX = 'kakeibo-manual-'
+const KEEP_MANUAL_FILES = 10
+const MANUAL_COOLDOWN_MINUTES = 5
 
 function getServiceClient(): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL')
@@ -54,6 +59,14 @@ function backupDateJST(): string {
   const m = String(jst.getUTCMonth() + 1).padStart(2, '0')
   const d = String(jst.getUTCDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
+}
+
+// JST の HHMMSS（手動バックアップのファイル名を1日に複数作れるようにする）
+function backupTimeJST(): string {
+  const jst = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  return [jst.getUTCHours(), jst.getUTCMinutes(), jst.getUTCSeconds()]
+    .map((n) => String(n).padStart(2, '0'))
+    .join('')
 }
 
 // ---- Google OAuth 認証（リフレッシュトークン → アクセストークン）----
@@ -138,10 +151,10 @@ async function uploadJson(token: string, folderId: string, filename: string, con
   }
 }
 
-// 古いバックアップを削除（新しい順に KEEP_FILES 件だけ残す）
-async function pruneOldBackups(token: string, folderId: string): Promise<void> {
+// 古いバックアップを削除（prefix のファイルを新しい順に keep 件だけ残す）
+async function pruneOldBackups(token: string, folderId: string, prefix: string, keep: number): Promise<void> {
   const q = encodeURIComponent(
-    `'${folderId}' in parents and name contains '${FILE_PREFIX}' and trashed=false`,
+    `'${folderId}' in parents and name contains '${prefix}' and trashed=false`,
   )
   const res = await fetch(
     `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&fields=files(id,name,createdTime)&pageSize=1000`,
@@ -149,7 +162,7 @@ async function pruneOldBackups(token: string, folderId: string): Promise<void> {
   )
   const data = await res.json()
   const files: { id: string }[] = data.files ?? []
-  const toDelete = files.slice(KEEP_FILES)
+  const toDelete = files.slice(keep)
   for (const f of toDelete) {
     await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
       method: 'DELETE',
@@ -175,31 +188,51 @@ Deno.serve(async (req) => {
 
   const sb = getServiceClient()
 
-  // ログ記録先の世帯を決定（手動: 呼び出しユーザーの世帯 / cron: 全世帯）。
-  // どちらでもない（ユーザーJWTも secret キーの apikey も無い）リクエストは拒否する
-  // ——そうしないと URL さえ知っていれば誰でも全世帯分のバックアップを起動できてしまう。
+  // cron（secret キーの apikey）なら全世帯、そうでなければログイン済みユーザーの
+  // 世帯のみを対象にする。どちらでもないリクエストは拒否する。
+  let hid: string | null = null // null = cron（全世帯）
   let logHids: string[] = []
   try {
-    const caller = await getCallerContext(req, sb)
-    if (caller) {
-      logHids = [caller.householdId]
-    } else if (isCronAuthorized(req)) {
+    if (isCronAuthorized(req)) {
       const { data: hs } = await sb.from('households').select('id')
       logHids = (hs ?? []).map((h: { id: string }) => h.id)
     } else {
-      return jsonResponse({ error: '認証が必要です。' }, 401)
+      const caller = await getCallerContext(req, sb)
+      if (!caller) return jsonResponse({ error: '認証が必要です。' }, 401)
+      hid = caller.householdId
+      logHids = [hid]
+
+      // 連打防止: 同じ世帯の手動バックアップは数分に1回まで
+      const since = new Date(Date.now() - MANUAL_COOLDOWN_MINUTES * 60 * 1000).toISOString()
+      const { count } = await sb
+        .from('backup_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('household_id', hid)
+        .like('filename', `${MANUAL_FILE_PREFIX}%`)
+        .gte('created_at', since)
+      if ((count ?? 0) > 0) {
+        return jsonResponse(
+          { success: false, error: `手動バックアップは${MANUAL_COOLDOWN_MINUTES}分に1回までです。少し待ってからお試しください。` },
+          429,
+        )
+      }
     }
   } catch (e) {
     return jsonResponse({ error: String((e as Error)?.message ?? e) }, 500)
   }
 
-  const filename = `${FILE_PREFIX}${backupDateJST()}.json`
+  const isManual = hid !== null
+  const filename = isManual
+    ? `${MANUAL_FILE_PREFIX}${backupDateJST()}-${backupTimeJST()}.json`
+    : `${FILE_PREFIX}${backupDateJST()}.json`
 
   try {
-    // 1) 全テーブルを取得
+    // 1) テーブルを取得（手動は自世帯の行のみ）
     const tables: Record<string, unknown[]> = {}
     for (const t of BACKUP_TABLES) {
-      const { data, error } = await sb.from(t).select('*')
+      let q = sb.from(t).select('*')
+      if (isManual) q = q.eq(t === 'households' ? 'id' : 'household_id', hid)
+      const { data, error } = await q
       if (error) throw new Error(`${t} の取得に失敗: ${error.message}`)
       tables[t] = data ?? []
     }
@@ -212,8 +245,9 @@ Deno.serve(async (req) => {
     const folderId = await resolveFolderId(token)
     await uploadJson(token, folderId, filename, content)
 
-    // 3) 古いバックアップを削除（30件保持）
-    await pruneOldBackups(token, folderId)
+    // 3) 古いバックアップを削除（日次30件・手動10件をそれぞれ別枠で保持）
+    if (isManual) await pruneOldBackups(token, folderId, MANUAL_FILE_PREFIX, KEEP_MANUAL_FILES)
+    else await pruneOldBackups(token, folderId, FILE_PREFIX, KEEP_FILES)
 
     // 4) 成功ログ
     await logBackup(sb, logHids, { status: 'success', filename, file_size: fileSize, error_message: null })
