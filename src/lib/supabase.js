@@ -107,7 +107,11 @@ export async function runDailyBackup() {
   const c = getClient()
   if (!c) throw new Error('Supabase の接続情報が設定されていません。')
   const { data, error } = await c.functions.invoke('daily-backup', { body: { manual: true } })
-  if (error) throw error
+  if (error) {
+    // 非2xx（連打制限の429・失敗の500）でも関数が返したメッセージを表示する
+    const body = await error.context?.json?.().catch(() => null)
+    throw new Error(body?.error || error.message)
+  }
   if (data && data.success === false) {
     throw new Error(data.error || 'バックアップに失敗しました。')
   }

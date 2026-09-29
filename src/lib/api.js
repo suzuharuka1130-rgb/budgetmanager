@@ -286,11 +286,17 @@ export async function fetchOtherExpenseTransactions(otherExpenseId) {
 // ---- レシート画像（Supabase Storage: receipts バケット）----
 const RECEIPTS_BUCKET = 'receipts'
 
-// 画像をアップロードし、保存パスを返す
+// 画像をアップロードし、保存パスを返す。
+// パスは「<世帯ID>/...」。ストレージのRLSが先頭フォルダ＝自世帯IDのときだけ
+// 読み書きを許可するため（migrations/security_hardening.sql）、他世帯の画像には触れない。
 export async function uploadReceipt(file, { year, month, card_id }) {
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-  const path = `${year}-${month}-${card_id}-${Date.now()}.${ext}`
-  const { error } = await client().storage.from(RECEIPTS_BUCKET).upload(path, file, {
+  const c = client()
+  const { data: hid, error: hidError } = await c.rpc('get_my_household_id')
+  if (hidError) throw hidError
+  if (!hid) throw new Error('世帯が見つかりません。')
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+  const path = `${hid}/${year}-${month}-${card_id}-${Date.now()}.${ext}`
+  const { error } = await c.storage.from(RECEIPTS_BUCKET).upload(path, file, {
     contentType: file.type || 'image/jpeg',
     upsert: false,
   })
