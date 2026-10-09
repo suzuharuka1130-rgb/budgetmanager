@@ -72,6 +72,8 @@ export async function signInWithGoogle() {
 }
 
 const AUTH_ERROR_PARAMS = ['error', 'error_code', 'error_description']
+// Supabase がエラー時のリダイレクトにだけ付ける目印（中身は空）
+const AUTH_MARKER_PARAMS = ['sb']
 
 // Google ログイン失敗時に Supabase が URL へ付けるエラーを取り出し、URL から取り除く。
 // supabase-js は失敗時に URL を掃除しないため、再読み込みで同じエラーが出ないようここで消す。
@@ -82,7 +84,10 @@ export function takeAuthRedirectError() {
   const pick = (k) => url.searchParams.get(k) || hash.get(k)
   if (!AUTH_ERROR_PARAMS.some((k) => pick(k))) return null
   const result = { error: pick('error'), code: pick('error_code'), description: pick('error_description') }
-  AUTH_ERROR_PARAMS.forEach((k) => { url.searchParams.delete(k); hash.delete(k) })
+  for (const k of [...AUTH_ERROR_PARAMS, ...AUTH_MARKER_PARAMS]) {
+    url.searchParams.delete(k)
+    hash.delete(k)
+  }
   url.hash = hash.toString()
   window.history.replaceState(window.history.state, '', url.toString())
   return result
