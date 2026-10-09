@@ -166,6 +166,25 @@ Run in the Supabase SQL Editor:
 
 Create auth users for each person who will use the app (Authentication → Users).
 
+#### Google login (optional)
+
+The login screen offers **Googleでログイン** alongside email/password. A Google account signs in to
+the existing user with the same (confirmed) email — Supabase links the Google identity automatically,
+so the household and data are unchanged. Email/password keeps working.
+
+1. In Google Cloud, use a project dedicated to login (separate from the Drive backup client).
+   Configure the OAuth consent screen with only the `openid`, email, and profile scopes, and create
+   an OAuth client of type **Web application** with the authorized redirect URI
+   `https://<project-ref>.supabase.co/auth/v1/callback`.
+2. In Supabase → Authentication → Sign In / Providers, enable **Google** with that client ID and
+   secret, and turn off **Allow new users to sign up** so a Google account without a matching user is
+   rejected instead of creating an empty account.
+3. In Authentication → URL Configuration, set the Site URL to the app URL and add `<app URL>/**` to
+   Redirect URLs (e.g. `http://localhost:5173/**` for local development).
+
+Use a separate Supabase project and Google client for local development so testing never touches
+production users.
+
 ### 4. Edge Functions (optional)
 
 Deploy notification and receipt functions:

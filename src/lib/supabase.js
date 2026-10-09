@@ -36,7 +36,7 @@ export function getClient() {
   if (!hasCredentials()) return null
   if (!client) {
     const { url, anonKey } = getCredentials()
-    client = createClient(url, anonKey)
+    client = createClient(url, anonKey, { auth: { flowType: 'pkce' } })
   }
   return client
 }
@@ -54,6 +54,43 @@ export async function signIn(email, password) {
   if (!c) throw new Error('Supabase の接続情報が設定されていません。')
   const { error } = await c.auth.signInWithPassword({ email, password })
   if (error) throw error
+}
+
+// Google ログイン。Google の画面へ遷移し、戻ってきた時点で onAuthStateChange が SIGNED_IN を通知する。
+// redirectTo は Supabase の Redirect URLs 許可リストに含まれている必要がある。
+export async function signInWithGoogle() {
+  const c = getClient()
+  if (!c) throw new Error('Supabase の接続情報が設定されていません。')
+  const { error } = await c.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/`,
+      queryParams: { prompt: 'select_account' },
+    },
+  })
+  if (error) throw error
+}
+
+const AUTH_ERROR_PARAMS = ['error', 'error_code', 'error_description']
+// Supabase がエラー時のリダイレクトにだけ付ける目印（中身は空）
+const AUTH_MARKER_PARAMS = ['sb']
+
+// Google ログイン失敗時に Supabase が URL へ付けるエラーを取り出し、URL から取り除く。
+// supabase-js は失敗時に URL を掃除しないため、再読み込みで同じエラーが出ないようここで消す。
+// 返り値: { error, code, description } または null
+export function takeAuthRedirectError() {
+  const url = new URL(window.location.href)
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ''))
+  const pick = (k) => url.searchParams.get(k) || hash.get(k)
+  if (!AUTH_ERROR_PARAMS.some((k) => pick(k))) return null
+  const result = { error: pick('error'), code: pick('error_code'), description: pick('error_description') }
+  for (const k of [...AUTH_ERROR_PARAMS, ...AUTH_MARKER_PARAMS]) {
+    url.searchParams.delete(k)
+    hash.delete(k)
+  }
+  url.hash = hash.toString()
+  window.history.replaceState(window.history.state, '', url.toString())
+  return result
 }
 
 export async function signOut() {
