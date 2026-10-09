@@ -135,6 +135,14 @@ export async function sendLineFlexMessage(
   return pushMessage({ type: 'flex', altText, contents }, userIds)
 }
 
+// LINE のアプリ内ブラウザでは Google が OAuth ログインを拒否する（disallowed_useragent）ため、
+// openExternalBrowser=1 を付けて端末の標準ブラウザで開かせる。
+function withExternalBrowser(url: string): string {
+  const u = new URL(url)
+  u.searchParams.set('openExternalBrowser', '1')
+  return u.toString()
+}
+
 /**
  * 複数行のレポート本文 + アプリを開くボタンを持つ Flex Message（bubble）を組み立てる。
  * Flex の text コンポーネントは改行を解釈しないため、行ごとに分割してスタックする。
@@ -142,6 +150,7 @@ export async function sendLineFlexMessage(
  */
 export function buildAppLinkFlexContents(bodyText: string, appUrl: string): Record<string, unknown> {
   const lines = bodyText.split('\n')
+  const uri = withExternalBrowser(appUrl)
   return {
     type: 'bubble',
     body: {
@@ -164,7 +173,7 @@ export function buildAppLinkFlexContents(bodyText: string, appUrl: string): Reco
           type: 'button',
           style: 'primary',
           color: '#166534',
-          action: { type: 'uri', label: 'Kakeiboを開く', uri: appUrl },
+          action: { type: 'uri', label: 'Kakeiboを開く', uri },
         },
       ],
     },
