@@ -27,3 +27,7 @@ verify_jwt = false
 # 手動実行時は関数内で Authorization のJWTを検証して世帯を特定する。
 [functions.daily-backup]
 verify_jwt = false
+
+# ブラウザから呼ぶため検証OFF（関数内でJWT手動検証）。Google のリフレッシュトークンを扱う。
+[functions.google-profile]
+verify_jwt = false
