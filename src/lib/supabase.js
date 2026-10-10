@@ -56,6 +56,41 @@ export async function signIn(email, password) {
   if (error) throw error
 }
 
+// select_account でアカウント選択、consent + offline でリフレッシュトークンを受け取る。
+// これがないと、設定画面を開いても Google の最新プロフィール写真を取り直せない。
+const GOOGLE_OAUTH_PARAMS = { access_type: 'offline', prompt: 'select_account consent' }
+
+// ログイン中のユーザーに Google を紐づける。Google の画面へ遷移し、戻ると identities に追加されている。
+// Supabase 側で「手動でのアイデンティティ紐づけ」が有効である必要がある。
+export async function linkGoogle() {
+  const c = getClient()
+  if (!c) throw new Error('Supabase の接続情報が設定されていません。')
+  const { error } = await c.auth.linkIdentity({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/`,
+      queryParams: GOOGLE_OAUTH_PARAMS,
+    },
+  })
+  if (error) throw error
+}
+
+// 紐づいている Google アカウント。未連携なら null。
+// { email, avatarUrl }
+export async function getGoogleIdentity() {
+  const c = getClient()
+  if (!c) return null
+  const { data, error } = await c.auth.getUserIdentities()
+  if (error) throw error
+  const identity = data?.identities?.find((i) => i.provider === 'google')
+  if (!identity) return null
+  const meta = identity.identity_data || {}
+  return {
+    email: meta.email || null,
+    avatarUrl: meta.avatar_url || meta.picture || null,
+  }
+}
+
 // Google ログイン。Google の画面へ遷移し、戻ってきた時点で onAuthStateChange が SIGNED_IN を通知する。
 // redirectTo は Supabase の Redirect URLs 許可リストに含まれている必要がある。
 export async function signInWithGoogle() {
@@ -65,10 +100,30 @@ export async function signInWithGoogle() {
     provider: 'google',
     options: {
       redirectTo: `${window.location.origin}/`,
-      queryParams: { prompt: 'select_account' },
+      queryParams: GOOGLE_OAUTH_PARAMS,
     },
   })
   if (error) throw error
+}
+
+// ダッシュボードのエディタから作った関数は、表示名と URL の末尾が別になる。
+// この開発プロジェクトの実体は /functions/v1/clever-service。
+const GOOGLE_PROFILE_FN = 'clever-service'
+
+// OAuth 直後のセッションに載っているリフレッシュトークンをサーバへ預ける。
+export async function storeGoogleRefreshToken(refreshToken) {
+  const c = getClient()
+  if (!c || !refreshToken) return
+  await c.functions.invoke(GOOGLE_PROFILE_FN, { body: { refreshToken } })
+}
+
+// 保存済みトークンで Google に今のプロフィール写真 URL を問い合わせる。未保存・失敗時は null。
+export async function fetchFreshGooglePicture() {
+  const c = getClient()
+  if (!c) return null
+  const { data, error } = await c.functions.invoke(GOOGLE_PROFILE_FN, { body: {} })
+  if (error || !data?.picture) return null
+  return data.picture
 }
 
 const AUTH_ERROR_PARAMS = ['error', 'error_code', 'error_description']

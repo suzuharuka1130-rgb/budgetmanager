@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { getCredentials, saveCredentials, signOut, hasEnvCredentials, sendMonthlyReport, sendCustomNotificationTest, getSession } from '../lib/supabase'
+import { getCredentials, saveCredentials, signOut, hasEnvCredentials, sendMonthlyReport, sendCustomNotificationTest, getSession, getGoogleIdentity, fetchFreshGooglePicture, linkGoogle, takeAuthRedirectError } from '../lib/supabase'
 import {
   fetchNotificationPreferences, upsertNotificationPreferences, setAppSetting,
   addCard, updateCard, deactivateCard, setCardOrder,
@@ -15,6 +15,23 @@ import BackupRestore from '../components/BackupRestore'
 import { useMeta } from '../lib/meta'
 import { useHousehold } from '../lib/household'
 import { useTheme } from '../lib/theme'
+
+function GoogleAvatar({ url }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [url])
+  if (!url || failed) {
+    return <span className="account-avatar account-avatar-fallback" aria-hidden="true">G</span>
+  }
+  return (
+    <img
+      className="account-avatar"
+      src={url}
+      alt=""
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
+  )
+}
 
 const containerVariants = {
   hidden: {},
@@ -49,6 +66,12 @@ export default function Settings({ onCredentialsChange }) {
   const [lineInput, setLineInput] = useState('')
   const [memberBusy, setMemberBusy] = useState(false)
 
+  // Google連携
+  const [googleIdentity, setGoogleIdentity] = useState(null)
+  const [googleLoading, setGoogleLoading] = useState(true)
+  const [googleBusy, setGoogleBusy] = useState(false)
+  const [googleError, setGoogleError] = useState(null)
+
   const myMember = household.members.find((m) => m.user_id === userId)
 
   // レポートグループの選択肢 = 既定 + 既存カードで使われているグループ
@@ -66,6 +89,65 @@ export default function Settings({ onCredentialsChange }) {
     setMemberBusy(true)
     try { setLinkCode(await createLineLinkCode()) } catch { /* ignore */ } finally { setMemberBusy(false) }
   }
+  function withCacheBust(url) {
+    if (!url) return null
+    try {
+      const u = new URL(url)
+      u.searchParams.set('cb', String(Date.now()))
+      return u.toString()
+    } catch {
+      return url
+    }
+  }
+
+  async function loadGoogleIdentity() {
+    try {
+      const identity = await getGoogleIdentity()
+      if (!identity) {
+        setGoogleIdentity(null)
+        return
+      }
+      try {
+        const picture = await fetchFreshGooglePicture()
+        identity.avatarUrl = withCacheBust(picture || identity.avatarUrl)
+      } catch {
+        identity.avatarUrl = withCacheBust(identity.avatarUrl)
+      }
+      setGoogleIdentity(identity)
+    } catch {
+      setGoogleIdentity(null)
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const redirectError = takeAuthRedirectError()
+    if (redirectError) {
+      setGoogleError(redirectError.error === 'access_denied'
+        ? 'Google連携がキャンセルされました。'
+        : 'Google連携に失敗しました。もう一度お試しください。')
+    }
+    loadGoogleIdentity()
+    const onPageShow = (e) => { if (e.persisted) setGoogleBusy(false) }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
+
+  async function handleLinkGoogle() {
+    setGoogleBusy(true)
+    setGoogleError(null)
+    try {
+      // 戻ってきたとき設定画面を開き直す（タブ状態はリロードで消える）
+      sessionStorage.setItem('kakeibo_open_settings', '1')
+      await linkGoogle()
+    } catch {
+      sessionStorage.removeItem('kakeibo_open_settings')
+      setGoogleError('Google連携を開始できませんでした。もう一度お試しください。')
+      setGoogleBusy(false)
+    }
+  }
+
   async function handleSaveLineId() {
     if (!userId) return
     setMemberBusy(true)
@@ -218,7 +300,34 @@ export default function Settings({ onCredentialsChange }) {
           ))}
         </ul>
 
-        <h4 className="section-title" style={{ marginTop: '16px' }}>自分のLINE連携</h4>
+        <h4 className="section-title" style={{ marginTop: '16px' }}>メンバーを招待</h4>
+        <p className="muted small">招待コードを発行して相手に共有してください（7日間有効）。相手はログイン後にコードを入力すると同じ家計に参加できます。</p>
+        <button className="btn" onClick={handleInvite} disabled={memberBusy || !household.hasHousehold}>招待コードを発行</button>
+        {inviteCode && <p className="form-ok">招待コード: <strong>{inviteCode}</strong></p>}
+      </motion.div>
+
+      <motion.div className="card" variants={itemVariants}>
+        <h3 className="section-title">アカウント連携</h3>
+
+        <h4 className="section-title" style={{ marginTop: '16px' }}>Google連携</h4>
+        {googleLoading ? (
+          <p className="muted small">読み込み中...</p>
+        ) : googleIdentity ? (
+          <div className="account-link-row">
+            <GoogleAvatar url={googleIdentity.avatarUrl} />
+            <span className="master-name">{googleIdentity.email || 'メールアドレスなし'}</span>
+          </div>
+        ) : (
+          <>
+            <p className="muted small">未連携。ログイン中のアカウントに Google を紐づけます。</p>
+            <button className="btn" onClick={handleLinkGoogle} disabled={googleBusy || !connected}>
+              {googleBusy ? 'Googleに移動中...' : 'Googleを連携する'}
+            </button>
+          </>
+        )}
+        {googleError && <p className="form-error">{googleError}</p>}
+
+        <h4 className="section-title" style={{ marginTop: '16px' }}>LINE連携</h4>
         <p className="muted small">
           現在: {myMember?.line_user_id ? '連携済み' : '未連携'}。
           コードを発行してLINE Botに送信すると自動で連携されます。
@@ -238,11 +347,6 @@ export default function Settings({ onCredentialsChange }) {
           </label>
           <button className="btn" onClick={handleSaveLineId} disabled={memberBusy || !lineInput.trim()}>保存</button>
         </div>
-
-        <h4 className="section-title" style={{ marginTop: '16px' }}>メンバーを招待</h4>
-        <p className="muted small">招待コードを発行して相手に共有してください（7日間有効）。相手はログイン後にコードを入力すると同じ家計に参加できます。</p>
-        <button className="btn" onClick={handleInvite} disabled={memberBusy || !household.hasHousehold}>招待コードを発行</button>
-        {inviteCode && <p className="form-ok">招待コード: <strong>{inviteCode}</strong></p>}
       </motion.div>
 
       <motion.div className="card" variants={itemVariants}>

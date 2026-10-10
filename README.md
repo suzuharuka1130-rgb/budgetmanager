@@ -181,6 +181,11 @@ so the household and data are unchanged. Email/password keeps working.
    rejected instead of creating an empty account.
 3. In Authentication → URL Configuration, set the Site URL to the app URL and add `<app URL>/**` to
    Redirect URLs (e.g. `http://localhost:5173/**` for local development).
+4. Run `migrations/google_oauth_tokens.sql`, deploy `google-profile`, and set
+   `GOOGLE_LOGIN_CLIENT_ID` / `GOOGLE_LOGIN_CLIENT_SECRET` to the **login** OAuth client
+   (not the Drive backup client). Settings then asks Google for the current profile photo
+   each time it opens. The refresh token is stored server-side and is not readable from the app.
+   Existing Google users receive that token the next time they sign in with Google.
 
 Use a separate Supabase project and Google client for local development so testing never touches
 production users.
@@ -195,6 +200,7 @@ npx supabase functions deploy custom-reminder
 npx supabase functions deploy send-line-message
 npx supabase functions deploy analyze-receipt
 npx supabase functions deploy daily-backup
+npx supabase functions deploy google-profile
 ```
 
 Set secrets in Supabase (Settings → Edge Functions → Secrets):
@@ -209,6 +215,8 @@ Set secrets in Supabase (Settings → Edge Functions → Secrets):
 | `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret for Drive backup |
 | `GOOGLE_OAUTH_REFRESH_TOKEN` | OAuth refresh token (scope `drive.file`) for Drive backup |
 | `GOOGLE_DRIVE_FOLDER_ID` | *(optional)* target folder ID; auto-created if unset |
+| `GOOGLE_LOGIN_CLIENT_ID` | OAuth client ID for Google sign-in (profile photo refresh) |
+| `GOOGLE_LOGIN_CLIENT_SECRET` | OAuth client secret for that same login client |
 
 > The `daily-backup` function requires running `migrations/backup_logs.sql` first (creates the
 > `backup_logs` table and the `restore_household_data` RPC). `monthly-report` and

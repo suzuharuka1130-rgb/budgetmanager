@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { hasCredentials, getSession, onAuthChange } from './lib/supabase'
+import { hasCredentials, getSession, onAuthChange, storeGoogleRefreshToken } from './lib/supabase'
 import { useMeta } from './lib/meta'
 import { useHousehold } from './lib/household'
 import HouseholdOnboarding from './pages/HouseholdOnboarding'
@@ -78,6 +78,11 @@ const GearIcon = () => (
   </Svg>
 )
 
+// Google連携から戻ったとき、設定タブを開く。モジュール読み込み時に一度だけ取り出す
+// （useEffect で消すと StrictMode の再マウントで初期タブに戻ってしまう）。
+const OPEN_SETTINGS_ON_LOAD = sessionStorage.getItem('kakeibo_open_settings') === '1'
+if (OPEN_SETTINGS_ON_LOAD) sessionStorage.removeItem('kakeibo_open_settings')
+
 const TABS = [
   { key: 'this', label: '今月', Icon: HomeIcon },
   { key: 'month', label: '月次', Icon: CalendarIcon },
@@ -91,7 +96,7 @@ export default function App() {
   const [connected, setConnected] = useState(hasCredentials())
   const [session, setSession] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
-  const [tab, setTab] = useState('this')
+  const [tab, setTab] = useState(OPEN_SETTINGS_ON_LOAD ? 'settings' : 'this')
   const meta = useMeta()
   const household = useHousehold()
 
@@ -125,6 +130,9 @@ export default function App() {
     // 明示的な SIGNED_OUT / INITIAL_SESSION 以外での null セッションも無視する
     // （復帰直後の一時的なセッション欠落でログイン画面に飛ばされるのを防ぐ）。
     const unsubscribe = onAuthChange((s, event) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && s?.provider_refresh_token) {
+        storeGoogleRefreshToken(s.provider_refresh_token).catch(() => {})
+      }
       setSession((prev) => {
         if (!s && event !== 'SIGNED_OUT' && event !== 'INITIAL_SESSION') return prev
         if (event === 'TOKEN_REFRESHED' && prev?.user?.id && prev.user.id === s?.user?.id) return prev
